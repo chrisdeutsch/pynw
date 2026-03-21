@@ -1,0 +1,10 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+.direnv
+target
+__pycache__/
+*.so
+.hypothesis/
+.benchmarks/
+site/

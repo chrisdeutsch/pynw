@@ -1,0 +1,50 @@
+output:
+  - meta
+  - summary
+  - empty_summary
+  - skips
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: ruff
+      glob: "*.{py,pyi}"
+      stage_fixed: true
+      group:
+        piped: true
+        jobs:
+          - run: ruff format {staged_files}
+          - run: ruff check --fix {staged_files}
+
+    - name: cargo fmt
+      glob: "*.rs"
+      stage_fixed: true
+      group:
+        piped: true
+        jobs:
+          - run: cargo fmt --check
+
+    - name: markdownlint
+      glob: "*.md"
+      stage_fixed: true
+      run: markdownlint --fix {staged_files}
+
+    - name: taplo
+      glob: "*.toml"
+      stage_fixed: true
+      run: taplo format {staged_files}
+
+    - name: actionlint
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: actionlint {staged_files}
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: cargo clippy
+      glob: "*.rs"
+      run: cargo clippy --all-targets --all-features
+
+    - name: mypy
+      glob: "*.{py,pyi}"
+      run: mypy pynw

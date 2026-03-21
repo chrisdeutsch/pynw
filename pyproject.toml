@@ -1,0 +1,75 @@
+[build-system]
+requires = ["maturin>=1.11,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pynw"
+description = "Rust-accelerated Needleman-Wunsch global sequence alignment for precomputed score matrices."
+authors = [{ name = "Christopher Deutsch", email = "hello@cdeutsch.org" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.16"]
+keywords = [
+  "needleman-wunsch",
+  "sequence-alignment",
+  "dynamic-programming",
+  "bioinformatics",
+  "edit-distance",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Typing :: Typed",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/chrisdeutsch/pynw"
+Repository = "https://github.com/chrisdeutsch/pynw"
+Issues = "https://github.com/chrisdeutsch/pynw/issues"
+
+[tool.maturin]
+module-name = "pynw._rust"
+artifacts = ["pynw/py.typed"]
+
+[tool.pytest.ini_options]
+markers = [
+  "benchmark: performance benchmarks (run with: pytest -m benchmark)",
+  "hypothesis: property-based tests (deselected by default, run with: pytest -m hypothesis)",
+]
+addopts = "-m 'not hypothesis and not benchmark'"
+
+[tool.ruff.lint]
+select = [
+  "E",  # pyflakes: all errors
+  "F",  # pyflakes: all warnings
+  "B",  # flake8-bugbear: all checks
+  "UP", # pyupgrade: all checks
+  "I",  # isort: all checks
+  "D",  # pydocstyle: docstring conventions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+"pynw/__init__.py" = ["D205", "D400"] # docstring is an rST include directive
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.mypy]
+strict = true
