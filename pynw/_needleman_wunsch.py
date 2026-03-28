@@ -20,10 +20,10 @@ class NeedlemanWunschResult(NamedTuple):
 
     score: float
     """The optimal alignment score."""
-    row_idx: np.ndarray
+    row_idx: npt.NDArray[np.intp]
     """Index into the row sequence at each alignment position, or ``-1``
     for a gap."""
-    col_idx: np.ndarray
+    col_idx: npt.NDArray[np.intp]
     """Index into the column sequence at each alignment position, or ``-1``
     for a gap."""
 
