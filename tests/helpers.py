@@ -12,13 +12,13 @@ def char_score_matrix(
     match: float,
     mismatch: float,
 ) -> npt.NDArray[np.float64]:
-    """Build a (len(s1), len(s2)) float64 score matrix for two strings."""
-    n, m = len(s1), len(s2)
-    sm = np.empty((n, m), dtype=np.float64)
-    for i in range(n):
-        for j in range(m):
-            sm[i, j] = match if s1[i] == s2[j] else mismatch
-    return sm
+    """
+    Build a (len(s1), len(s2)) score matrix for two strings using match/mismatch
+    scoring.
+    """
+    return np.where(
+        np.array(list(s1))[:, None] == np.array(list(s2))[None, :], match, mismatch
+    )
 
 
 def nw_score(
@@ -44,9 +44,9 @@ def recompute_score_from_indices(
     """Walk index arrays and sum up the alignment score."""
     total = 0.0
     for i, j in zip(row_idx, col_idx, strict=True):
-        if i == -1:
+        if i < 0:
             total += gap_in_row
-        elif j == -1:
+        elif j < 0:
             total += gap_in_col
         else:
             total += float(score_matrix[i, j])

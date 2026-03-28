@@ -127,9 +127,9 @@ and run automatically as git hooks.
 ## Related projects
 
 - [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz):
-  Fast string distance functions (Levenshtein, Jaro-Winkler, etc.) with
-  built-in scoring and edit operations. Likely the better choice for
-  standard string distances.
+  Highly optimized string distances (Levenshtein, Jaro-Winkler, etc.) with
+  scoring, edit operations, and alignment. The better choice when you only
+  need standard string metrics.
 - [sequence-align](https://github.com/kensho-technologies/sequence_align):
   Rust-accelerated Needleman-Wunsch and Hirschberg for token sequences with
   built-in match/mismatch scoring.

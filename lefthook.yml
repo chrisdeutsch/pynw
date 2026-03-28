@@ -9,12 +9,13 @@ pre-commit:
   jobs:
     - name: ruff
       glob: "*.{py,pyi}"
-      stage_fixed: true
       group:
         piped: true
         jobs:
           - run: ruff format {staged_files}
+            stage_fixed: true
           - run: ruff check --fix {staged_files}
+            stage_fixed: true
 
     - name: cargo fmt
       glob: "*.rs"
