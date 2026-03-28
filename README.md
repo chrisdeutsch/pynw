@@ -2,6 +2,7 @@
 
 [![Check](https://github.com/chrisdeutsch/pynw/actions/workflows/check.yml/badge.svg)](https://github.com/chrisdeutsch/pynw/actions/workflows/check.yml)
 [![Build](https://github.com/chrisdeutsch/pynw/actions/workflows/build.yml/badge.svg)](https://github.com/chrisdeutsch/pynw/actions/workflows/build.yml)
+[![PyPI](https://img.shields.io/pypi/v/pynw)](https://pypi.org/project/pynw/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Rust-accelerated [Needleman-Wunsch](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm)
