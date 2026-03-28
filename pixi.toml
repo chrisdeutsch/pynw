@@ -24,6 +24,7 @@ numpy = "*"
 [feature.build.dependencies]
 pip = "*"
 rust = "*"
+rust-src = "*"
 maturin = "*"
 
 [feature.test.dependencies]
