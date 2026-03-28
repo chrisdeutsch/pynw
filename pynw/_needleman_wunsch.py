@@ -1,9 +1,9 @@
 """Global sequence alignment via Needleman-Wunsch dynamic programming.
 
 ``needleman_wunsch(similarity_matrix, ...)`` accepts a precomputed ``(n, m)``
-similarity matrix and returns index arrays (similar to
-``scipy.optimize.linear_sum_assignment``). The DP fill and traceback run
-entirely in Rust.
+similarity matrix and returns index arrays mapping each alignment position to
+an index in the original sequence (``-1`` for gaps). The DP fill and traceback
+run entirely in Rust.
 """
 
 import math
@@ -44,7 +44,10 @@ def needleman_wunsch(
     gap_penalty_col: float | None = None,
     check_finite: bool = False,
 ) -> NeedlemanWunschResult:
-    """Solve the global sequence alignment problem.
+    """Align two ordered sequences given a precomputed similarity matrix.
+
+    The total alignment score is the sum of similarity-matrix entries for
+    matched positions and gap penalties for insertions/deletions.
 
     Parameters
     ----------
@@ -83,6 +86,8 @@ def needleman_wunsch(
     -------
     NeedlemanWunschResult
         A named tuple with fields ``score``, ``row_idx``, and ``col_idx``.
+        ``row_idx`` and ``col_idx`` map each alignment position to an
+        index in the original sequence, with ``-1`` indicating a gap.
 
     Examples
     --------
@@ -108,10 +113,10 @@ def needleman_wunsch(
 
     Notes
     -----
-    Tie-breaking is deterministic: ``DIAG > UP > LEFT``.  The optimal
-    *score* is unique, but multiple alignments may achieve it.  This
-    rule prefers substitutions over gaps, producing compact alignments.
-    Other tools may return different co-optimal alignments.
+    When multiple alignments achieve the same optimal score, ties are
+    broken deterministically: ``Diagonal > Up > Left``.  This prefers
+    substitutions over gaps, producing compact alignments.  Other tools
+    may return different co-optimal alignments.
 
     All values in ``similarity_matrix`` and the gap penalties must be finite.
     Passing ``NaN`` or ``Inf`` is undefined behavior — the output will be
