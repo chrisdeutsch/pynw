@@ -91,25 +91,23 @@ def needleman_wunsch(
 
     Examples
     --------
-    Align two DNA sequences (1.0 for match, -1.0 for mismatch):
+    Align two DNA sequences using a simple match/mismatch scoring scheme:
 
     >>> import numpy as np
-    >>> row_seq = np.array(list("GATTACA"))
-    >>> col_seq = np.array(list("GCATGCA"))
-    >>> sm = np.where(row_seq[:, None] == col_seq[None, :], 1.0, -1.0)
-    >>> score, ri, ci = needleman_wunsch(sm, gap_penalty=-1.0)
-    >>> score
+    >>> row_seq = list("GATTACA")
+    >>> col_seq = list("GCATGCA")
+    >>> match, mismatch = 1.0, -1.0
+    >>> sm = np.where(
+    ...     np.array(row_seq)[:, None] == np.array(col_seq)[None, :],
+    ...     match, mismatch,
+    ... )
+    >>> result = needleman_wunsch(sm, gap_penalty=-1.0)
+    >>> result.score
     2.0
-    >>> "".join(np.where(ri >= 0, row_seq[ri], "-"))
+    >>> "".join(row_seq[i] if i >= 0 else "-" for i in result.row_idx)
     'G-ATTACA'
-    >>> "".join(np.where(ci >= 0, col_seq[ci], "-"))
+    >>> "".join(col_seq[i] if i >= 0 else "-" for i in result.col_idx)
     'GCA-TGCA'
-
-    The match-score component is composable, like
-    ``scipy.optimize.linear_sum_assignment``::
-
-        matched = (ri >= 0) & (ci >= 0)
-        sm[ri[matched], ci[matched]].sum()   # match contribution
 
     Notes
     -----
