@@ -89,5 +89,4 @@ def needleman_wunsch(
     All values in ``similarity_matrix`` and the gap penalties must be finite.
     Passing ``NaN`` or ``Inf`` is undefined behavior — the output will be
     silently meaningless.
-
     """
