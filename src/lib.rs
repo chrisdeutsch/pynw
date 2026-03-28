@@ -1,4 +1,4 @@
-//! PyO3 binding layer for the `pynw._rust` extension module.
+//! PyO3 binding layer for the `pynw._native` extension module.
 //!
 //! Safe `Array2` indexing is used throughout.  Benchmarking showed that
 //! `unsafe get_unchecked` offers no measurable improvement.
@@ -8,8 +8,8 @@ use pyo3::prelude::*;
 
 mod nw_core;
 
-#[pymodule(name = "_rust")]
-mod pynw_rust {
+#[pymodule(name = "_native")]
+mod pynw_native {
     use super::*;
 
     type NwTracebackIndicesOutput<'py> = (
