@@ -9,7 +9,7 @@ authors = [{ name = "Christopher Deutsch", email = "hello@cdeutsch.org" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.16"]
+dependencies = ["numpy>=1.21"]
 keywords = [
   "needleman-wunsch",
   "sequence-alignment",
