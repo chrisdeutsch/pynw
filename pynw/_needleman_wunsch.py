@@ -57,8 +57,8 @@ def needleman_wunsch(
         sequence.
     gap_penalty : float, default -1.0
         Penalty applied when a gap is inserted in either sequence.
-        Typically negative. Use ``gap_penalty_row`` or ``gap_penalty_col``
-        to specify different penalties for each sequence.
+        Use ``gap_penalty_row`` or ``gap_penalty_col`` to specify
+        different penalties for each sequence.
     gap_penalty_row : float, optional
         Penalty added when a gap is inserted in the row sequence
         (the column sequence advances). This can be thought of as the
