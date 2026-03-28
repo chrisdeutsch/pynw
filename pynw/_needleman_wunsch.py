@@ -12,7 +12,7 @@ from typing import NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pynw._rust import nw_traceback_indices
+from pynw._native import nw_traceback_indices
 
 
 class NeedlemanWunschResult(NamedTuple):

@@ -44,7 +44,7 @@ Repository = "https://github.com/chrisdeutsch/pynw"
 Issues = "https://github.com/chrisdeutsch/pynw/issues"
 
 [tool.maturin]
-module-name = "pynw._rust"
+module-name = "pynw._native"
 artifacts = ["pynw/py.typed"]
 
 [tool.pytest.ini_options]
