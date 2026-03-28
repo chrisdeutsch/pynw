@@ -32,6 +32,8 @@ pytest-benchmark = "*"
 hypothesis = "*"
 rapidfuzz = "*"
 scipy = "*"
+inline-snapshot = "*"
+fastembed = "*"
 
 [feature.lint.dependencies]
 ruff = "*"

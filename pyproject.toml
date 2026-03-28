@@ -51,8 +51,9 @@ artifacts = ["pynw/py.typed"]
 markers = [
   "benchmark: performance benchmarks (run with: pytest -m benchmark)",
   "hypothesis: property-based tests (deselected by default, run with: pytest -m hypothesis)",
+  "slow: slow tests such as embedding models (run with: pytest -m slow)",
 ]
-addopts = "-m 'not hypothesis and not benchmark'"
+addopts = "-m 'not hypothesis and not benchmark and not slow'"
 
 [tool.ruff.lint]
 select = [
