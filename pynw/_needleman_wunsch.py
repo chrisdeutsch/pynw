@@ -10,6 +10,7 @@ import math
 from typing import NamedTuple
 
 import numpy as np
+import numpy.typing as npt
 
 from pynw._rust import nw_traceback_indices
 
@@ -36,7 +37,7 @@ class NeedlemanWunschResult(NamedTuple):
 
 
 def needleman_wunsch(
-    similarity_matrix: np.ndarray,
+    similarity_matrix: npt.ArrayLike,
     *,
     gap_penalty: float = -1.0,
     gap_penalty_row: float | None = None,

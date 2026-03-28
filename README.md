@@ -21,7 +21,7 @@ sequences, or any domain where element order matters.
 
 ## Installation
 
-Requires Python 3.10+ and NumPy 1.16+. Prebuilt wheels for Linux, macOS, and
+Requires Python 3.10+ and NumPy 1.21+. Prebuilt wheels for Linux, macOS, and
 Windows are published on PyPI.
 
 ```sh
