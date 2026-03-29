@@ -6,6 +6,7 @@ use numpy::{
 use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
 mod nw;
+mod nw2;
 
 fn as_pyarray<'py>(
     py: Python<'py>,
@@ -173,6 +174,63 @@ mod pynw_native {
 
         let (score, row_idx, col_idx) =
             nw::needleman_wunsch(&similarity_matrix, gap_penalty_row, gap_penalty_col);
+
+        Ok((score, row_idx.into_pyarray(py), col_idx.into_pyarray(py)))
+    }
+
+    /// Experimental Needleman-Wunsch with merges and splits
+    #[pyfunction]
+    #[pyo3(
+        signature = (similarity_matrix, similarity_matrix_split, similarity_matrix_merge, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=false),
+        text_signature = "(similarity_matrix, similarity_matrix_split, similarity_matrix_merge, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=False)",
+    )]
+    fn needleman_wunsch_2<'py>(
+        py: Python<'py>,
+        similarity_matrix: Bound<'py, PyAny>,
+        similarity_matrix_split: Bound<'py, PyAny>,
+        similarity_matrix_merge: Bound<'py, PyAny>,
+        gap_penalty: f64,
+        gap_penalty_row: Option<f64>,
+        gap_penalty_col: Option<f64>,
+        check_finite: bool,
+    ) -> PyResult<NeedlemanWunschResultType<'py>> {
+        let py_array = as_pyarray(py, &similarity_matrix)?;
+        let similarity_matrix = py_array.as_array();
+
+        let py_array = as_pyarray(py, &similarity_matrix_split)?;
+        let similarity_matrix_split = py_array.as_array();
+
+        let py_array = as_pyarray(py, &similarity_matrix_merge)?;
+        let similarity_matrix_merge = py_array.as_array();
+
+        let gap_penalty_row = gap_penalty_row.unwrap_or(gap_penalty);
+        let gap_penalty_col = gap_penalty_col.unwrap_or(gap_penalty);
+
+        if check_finite {
+            if !gap_penalty_row.is_finite() {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "gap_penalty_row is non-finite",
+                ));
+            }
+            if !gap_penalty_col.is_finite() {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "gap_penalty_col is non-finite",
+                ));
+            }
+            if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "similarity_matrix contains non-finite values (NaN or Inf)",
+                ));
+            }
+        }
+
+        let (score, row_idx, col_idx) = nw2::needleman_wunsch_2(
+            &similarity_matrix,
+            &similarity_matrix_split,
+            &similarity_matrix_merge,
+            gap_penalty_row,
+            gap_penalty_col,
+        );
 
         Ok((score, row_idx.into_pyarray(py), col_idx.into_pyarray(py)))
     }
