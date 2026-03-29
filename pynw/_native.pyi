@@ -89,3 +89,4 @@ def needleman_wunsch(
     Passing ``NaN`` or ``Inf`` is undefined behavior — the output will be
     silently meaningless.
     """
+    ...
