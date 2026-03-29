@@ -22,6 +22,10 @@ pre-commit:
       stage_fixed: true
       run: cargo fmt
 
+    - name: cargo lock
+      glob: "Cargo.toml"
+      run: cargo check --locked
+
     - name: markdownlint
       glob: "*.md"
       stage_fixed: true
@@ -35,10 +39,6 @@ pre-commit:
     - name: actionlint
       glob: ".github/workflows/*.{yml,yaml}"
       run: actionlint {staged_files}
-
-    - name: cargo lock
-      glob: "Cargo.toml"
-      run: cargo check --locked
 
 pre-push:
   parallel: true
