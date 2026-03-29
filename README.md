@@ -47,11 +47,11 @@ similarity_matrix = np.where(
     np.array(seq1)[:, None] == np.array(seq2)[None, :], match, mismatch
 )
 
-result = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
+score, row_idx, col_idx = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
 
-aligned1 = "".join(seq1[i] if i >= 0 else "-" for i in result.row_idx)
-aligned2 = "".join(seq2[i] if i >= 0 else "-" for i in result.col_idx)
-print(f"Score: {result.score}\n{aligned1}\n{aligned2}")
+aligned1 = "".join(seq1[i] if i >= 0 else "-" for i in row_idx)
+aligned2 = "".join(seq2[i] if i >= 0 else "-" for i in col_idx)
+print(f"Score: {score}\n{aligned1}\n{aligned2}")
 # Score: 2.0
 # G-ATTACA
 # GCA-TGCA

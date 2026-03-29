@@ -20,7 +20,7 @@ pre-commit:
     - name: cargo fmt
       glob: "*.rs"
       stage_fixed: true
-      run: cargo fmt --check
+      run: cargo fmt
 
     - name: markdownlint
       glob: "*.md"
