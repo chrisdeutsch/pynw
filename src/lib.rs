@@ -41,15 +41,15 @@ fn as_pyarray<'py>(
     Ok(array)
 }
 
+type NeedlemanWunschResultType<'py> = (
+    f64,
+    Bound<'py, PyArray1<isize>>,
+    Bound<'py, PyArray1<isize>>,
+);
+
 #[pymodule(name = "_native")]
 mod pynw_native {
     use super::*;
-
-    type NwTracebackIndicesOutput<'py> = (
-        f64,
-        Bound<'py, PyArray1<isize>>,
-        Bound<'py, PyArray1<isize>>,
-    );
 
     /// Align two ordered sequences given a precomputed similarity matrix.
     ///
@@ -138,7 +138,7 @@ mod pynw_native {
         gap_penalty_row: Option<f64>,
         gap_penalty_col: Option<f64>,
         check_finite: bool,
-    ) -> PyResult<NwTracebackIndicesOutput<'py>> {
+    ) -> PyResult<NeedlemanWunschResultType<'py>> {
         let py_array = as_pyarray(py, &similarity_matrix)?;
         let similarity_matrix = py_array.as_array();
 
