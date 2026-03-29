@@ -100,6 +100,9 @@ fn traceback_indices(traceback_matrix: &ArrayView2<Op>) -> (Vec<isize>, Vec<isiz
     let mut i = n;
     let mut j = m;
 
+    // We build indices back-to-front, then reverse. Multi-element extends
+    // (merge/split) must therefore push in descending order so that the
+    // final reversed output is ascending.
     while i > 0 || j > 0 {
         match traceback_matrix[[i, j]] {
             Op::Keep => {
@@ -113,7 +116,7 @@ fn traceback_indices(traceback_matrix: &ArrayView2<Op>) -> (Vec<isize>, Vec<isiz
                 debug_assert!(i > 1 && j > 0, "Merge at boundary would underflow");
                 i -= 2;
                 j -= 1;
-                row_idx.extend([i as isize, (i + 1) as isize]);
+                row_idx.extend([(i + 1) as isize, i as isize]);
                 col_idx.extend([j as isize, j as isize]);
             }
             Op::Split => {
@@ -121,7 +124,7 @@ fn traceback_indices(traceback_matrix: &ArrayView2<Op>) -> (Vec<isize>, Vec<isiz
                 i -= 1;
                 j -= 2;
                 row_idx.extend([i as isize, i as isize]);
-                col_idx.extend([j as isize, (j + 1) as isize])
+                col_idx.extend([(j + 1) as isize, j as isize])
             }
             Op::Delete => {
                 debug_assert!(i > 0, "Delete at row 0 would underflow");
