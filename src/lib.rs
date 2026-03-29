@@ -1,7 +1,4 @@
 //! PyO3 binding layer for the `pynw._native` extension module.
-//!
-//! Safe `Array2` indexing is used throughout.  Benchmarking showed that
-//! `unsafe get_unchecked` offers no measurable improvement.
 
 use numpy::{
     Element, IntoPyArray, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray2, get_array_module,
@@ -10,13 +7,19 @@ use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
 mod nw_core;
 
-fn as_array<'py>(py: Python<'py>, obj: Bound<'py, PyAny>) -> PyResult<PyReadonlyArray2<'py, f64>> {
+fn as_pyarray<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<PyReadonlyArray2<'py, f64>> {
     // This is a modified version of the extract method of PyArrayLike to convert into a 2d f64 array
+
     if let Ok(array) = obj.cast::<PyArray2<f64>>() {
+        // TODO: Check that array is C-contiguous?
         return Ok(array.readonly());
     }
 
     static AS_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+
     let as_array = AS_ARRAY
         .get_or_try_init(py, || {
             get_array_module(py)?.getattr("asarray").map(Into::into)
@@ -25,13 +28,15 @@ fn as_array<'py>(py: Python<'py>, obj: Bound<'py, PyAny>) -> PyResult<PyReadonly
 
     let kwargs = PyDict::new(py);
     kwargs.set_item(intern!(py, "dtype"), f64::get_dtype(py))?;
+
     let array = as_array
-        .call((obj,), Some(kwargs).as_ref())
-        .map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("Cannot convert array-like into float64 array")
-        })?
+        .call((obj,), Some(kwargs).as_ref())?
         .extract()
-        .map_err(|_| pyo3::exceptions::PyValueError::new_err("array-like must be 2-dimensional"))?;
+        .map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 2-dimensional float64 array",
+            )
+        })?;
 
     Ok(array)
 }
@@ -128,25 +133,14 @@ mod pynw_native {
     )]
     fn needleman_wunsch<'py>(
         py: Python<'py>,
-        // FIXME: This gives a terrible exception if conversion fails
-        // similarity_matrix: PyArrayLikeDyn<'py, f64, AllowTypeChange>,
         similarity_matrix: Bound<'py, PyAny>,
         gap_penalty: f64,
         gap_penalty_row: Option<f64>,
         gap_penalty_col: Option<f64>,
         check_finite: bool,
     ) -> PyResult<NwTracebackIndicesOutput<'py>> {
-        let py_array = as_array(py, similarity_matrix)?;
+        let py_array = as_pyarray(py, &similarity_matrix)?;
         let similarity_matrix = py_array.as_array();
-        // let similarity_matrix =
-        //     similarity_matrix
-        //         .as_array()
-        //         .into_dimensionality()
-        //         .map_err(|_| {
-        //             pyo3::exceptions::PyValueError::new_err(
-        //                 "similarity_matrix must be 2-dimensional",
-        //             )
-        //         })?;
 
         let gap_penalty_row = gap_penalty_row.unwrap_or(gap_penalty);
         let gap_penalty_col = gap_penalty_col.unwrap_or(gap_penalty);
