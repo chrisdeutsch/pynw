@@ -1,3 +1,7 @@
+# NOTE: This stub provides the docstring for type checkers and IDE support.
+# A copy exists as a Rust doc comment in src/lib.rs for runtime `help()`.
+# Keep both copies in sync.
+
 import numpy as np
 import numpy.typing as npt
 

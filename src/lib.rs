@@ -51,6 +51,10 @@ type NeedlemanWunschResultType<'py> = (
 mod pynw_native {
     use super::*;
 
+    // NOTE: This doc comment provides the runtime `help()` docstring.
+    // A copy exists in pynw/_native.pyi for type checkers and IDE support.
+    // Keep both copies in sync.
+    //
     /// Align two ordered sequences given a precomputed similarity matrix.
     ///
     /// The total alignment score is the sum of similarity-matrix entries for
