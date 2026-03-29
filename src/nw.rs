@@ -130,7 +130,7 @@ fn traceback_indices(traceback_matrix: &ArrayView2<Direction>) -> (Vec<isize>, V
     (row_idx, col_idx)
 }
 
-pub(crate) fn nw_traceback_indices_core(
+pub(crate) fn needleman_wunsch(
     similarity_matrix: &ArrayView2<f64>,
     gap_penalty_row: f64,
     gap_penalty_col: f64,

@@ -5,7 +5,7 @@ use numpy::{
 };
 use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
-mod nw_core;
+mod nw;
 
 fn as_pyarray<'py>(
     py: Python<'py>,
@@ -91,10 +91,14 @@ mod pynw_native {
     ///
     /// Returns
     /// -------
-    /// NeedlemanWunschResult
-    ///     A named tuple with fields ``score``, ``row_idx``, and ``col_idx``.
-    ///     ``row_idx`` and ``col_idx`` map each alignment position to an
-    ///     index in the original sequence, with ``-1`` indicating a gap.
+    /// score : float
+    ///     The optimal alignment score.
+    /// row_idx : ndarray of intp
+    ///     Index into the row sequence at each alignment position, or ``-1``
+    ///     for a gap.
+    /// col_idx : ndarray of intp
+    ///     Index into the column sequence at each alignment position, or ``-1``
+    ///     for a gap.
     ///
     /// Examples
     /// --------
@@ -108,12 +112,12 @@ mod pynw_native {
     /// ...     np.array(row_seq)[:, None] == np.array(col_seq)[None, :],
     /// ...     match, mismatch,
     /// ... )
-    /// >>> result = needleman_wunsch(sm, gap_penalty=-1.0)
-    /// >>> result.score
+    /// >>> score, row_idx, col_idx = needleman_wunsch(sm, gap_penalty=-1.0)
+    /// >>> score
     /// 2.0
-    /// >>> "".join(row_seq[i] if i >= 0 else "-" for i in result.row_idx)
+    /// >>> "".join(row_seq[i] if i >= 0 else "-" for i in row_idx)
     /// 'G-ATTACA'
-    /// >>> "".join(col_seq[i] if i >= 0 else "-" for i in result.col_idx)
+    /// >>> "".join(col_seq[i] if i >= 0 else "-" for i in col_idx)
     /// 'GCA-TGCA'
     ///
     /// Notes
@@ -163,11 +167,8 @@ mod pynw_native {
             }
         }
 
-        let (score, row_idx, col_idx) = nw_core::nw_traceback_indices_core(
-            &similarity_matrix,
-            gap_penalty_row,
-            gap_penalty_col,
-        );
+        let (score, row_idx, col_idx) =
+            nw::needleman_wunsch(&similarity_matrix, gap_penalty_row, gap_penalty_col);
 
         Ok((score, row_idx.into_pyarray(py), col_idx.into_pyarray(py)))
     }
