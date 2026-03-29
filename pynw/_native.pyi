@@ -94,3 +94,14 @@ def needleman_wunsch(
     silently meaningless.
     """
     ...
+
+def needleman_wunsch_2(
+    similarity_matrix: npt.ArrayLike,
+    similarity_matrix_split: npt.ArrayLike,
+    similarity_matrix_merge: npt.ArrayLike,
+    *,
+    gap_penalty: float = -1.0,
+    gap_penalty_row: float | None = None,
+    gap_penalty_col: float | None = None,
+    check_finite: bool = False,
+) -> tuple[float, npt.NDArray[np.intp], npt.NDArray[np.intp]]: ...
