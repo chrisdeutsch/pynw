@@ -78,3 +78,32 @@ def test_benchmark_rapidfuzz_editops(benchmark, length: int) -> None:
     s1, s2 = _random_string_pair(length)
     benchmark.group = f"levenshtein len={length}"
     benchmark(rapidfuzz_distance.Levenshtein.editops, s1, s2)
+
+
+# ---------------------------------------------------------------------------
+# C-order vs Fortran-order similarity matrices
+# ---------------------------------------------------------------------------
+
+
+def _score_matrix_c(size: int) -> np.ndarray:
+    rng = np.random.default_rng(RNG_SEED + size)
+    return np.ascontiguousarray(rng.standard_normal((size, size), dtype=np.float64))
+
+
+def _score_matrix_f(size: int) -> np.ndarray:
+    rng = np.random.default_rng(RNG_SEED + size)
+    return np.asfortranarray(rng.standard_normal((size, size), dtype=np.float64))
+
+
+@pytest.mark.parametrize("size", MATRIX_SIZES, ids=lambda n: f"{n}x{n}")
+def test_benchmark_needleman_wunsch_c_order(benchmark, size: int) -> None:
+    score_matrix = _score_matrix_c(size)
+    benchmark.group = f"memory order {size}x{size}"
+    benchmark(needleman_wunsch, score_matrix)
+
+
+@pytest.mark.parametrize("size", MATRIX_SIZES, ids=lambda n: f"{n}x{n}")
+def test_benchmark_needleman_wunsch_f_order(benchmark, size: int) -> None:
+    score_matrix = _score_matrix_f(size)
+    benchmark.group = f"memory order {size}x{size}"
+    benchmark(needleman_wunsch, score_matrix)
