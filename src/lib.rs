@@ -6,7 +6,7 @@ use numpy::{
 use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
 mod nw;
-mod nw2;
+mod nw_merge_split;
 
 fn as_pyarray<'py>(
     py: Python<'py>,
@@ -51,6 +51,16 @@ type NeedlemanWunschResultType<'py> = (
 #[pymodule(name = "_native")]
 mod pynw_native {
     use super::*;
+
+    #[pymodule_init]
+    fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        m.add("OP_ALIGN", nw_merge_split::EditOp::Align as u8)?;
+        m.add("OP_INSERT", nw_merge_split::EditOp::Insert as u8)?;
+        m.add("OP_DELETE", nw_merge_split::EditOp::Delete as u8)?;
+        m.add("OP_SPLIT", nw_merge_split::EditOp::Split as u8)?;
+        m.add("OP_MERGE", nw_merge_split::EditOp::Merge as u8)?;
+        Ok(())
+    }
 
     // NOTE: This doc comment provides the runtime `help()` docstring.
     // A copy exists in pynw/_native.pyi for type checkers and IDE support.
@@ -178,60 +188,138 @@ mod pynw_native {
         Ok((score, row_idx.into_pyarray(py), col_idx.into_pyarray(py)))
     }
 
-    /// Experimental Needleman-Wunsch with merges and splits
+    // NOTE: This doc comment provides the runtime `help()` docstring.
+    // A copy exists in pynw/_native.pyi for type checkers and IDE support.
+    // Keep both copies in sync.
+    //
+    /// Align two sequences with one-to-one, one-to-two (split), and
+    /// two-to-one (merge) matches.
+    ///
+    /// Extends Needleman-Wunsch with two additional edit operations: a row
+    /// element can be *split* to align with two consecutive column elements, or
+    /// two consecutive row elements can be *merged* to align with one column
+    /// element.  The score for each operation at each position is supplied by
+    /// the caller via separate score matrices.
+    ///
+    /// Parameters
+    /// ----------
+    /// align_scores : array_like, shape (n, m)
+    ///     ``align_scores[i, j]`` is the score for aligning row element *i*
+    ///     with column element *j* (one-to-one match).
+    /// split_scores : array_like, shape (n, m-1)
+    ///     ``split_scores[i, j]`` is the score for splitting row element *i*
+    ///     across column elements *j* and *j+1* (one row → two columns).
+    /// merge_scores : array_like, shape (n-1, m)
+    ///     ``merge_scores[i, j]`` is the score for merging row elements *i*
+    ///     and *i+1* into column element *j* (two rows → one column).
+    /// gap_penalty : float, default -1.0
+    ///     Penalty for an insert or delete step.  Use ``insert_penalty`` or
+    ///     ``delete_penalty`` to set them independently.
+    /// insert_penalty : float, optional
+    ///     Penalty for advancing the column sequence without consuming a row
+    ///     element.  Defaults to ``gap_penalty``.
+    /// delete_penalty : float, optional
+    ///     Penalty for advancing the row sequence without consuming a column
+    ///     element.  Defaults to ``gap_penalty``.
+    /// check_finite : bool, default False
+    ///     If ``True``, raise ``ValueError`` when any score matrix or penalty
+    ///     contains ``NaN`` or ``Inf``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If any score matrix is not 2-dimensional, or if ``check_finite``
+    ///     is ``True`` and any value is non-finite.
+    ///
+    /// Returns
+    /// -------
+    /// score : float
+    ///     The optimal alignment score.
+    /// ops : ndarray of uint8, shape (k,)
+    ///     Sequence of edit operations describing the alignment.  Each element
+    ///     is one of the ``OP_*`` constants (or ``Op`` enum values).  Use
+    ///     ``indices_from_ops`` to reconstruct the row and column indices.
+    ///
+    ///     +---------------+-----------------------------------+
+    ///     | Op            | Meaning                           |
+    ///     +===============+===================================+
+    ///     | ``OP_ALIGN``  | row[i] aligned with col[j]        |
+    ///     | ``OP_INSERT`` | gap in row; col[j] consumed        |
+    ///     | ``OP_DELETE`` | row[i] consumed; gap in col        |
+    ///     | ``OP_SPLIT``  | row[i] split into col[j], col[j+1]|
+    ///     | ``OP_MERGE``  | row[i], row[i+1] merged into col[j]|
+    ///     +---------------+-----------------------------------+
+    ///
+    /// Notes
+    /// -----
+    /// Ties are broken deterministically: ``Align > Merge > Split > Delete > Insert``.
+    ///
+    /// All score values and penalties must be finite.  Passing ``NaN`` or
+    /// ``Inf`` without ``check_finite=True`` is undefined behavior.
     #[pyfunction]
     #[pyo3(
-        signature = (similarity_matrix, similarity_matrix_split, similarity_matrix_merge, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=false),
-        text_signature = "(similarity_matrix, similarity_matrix_split, similarity_matrix_merge, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=False)",
+        signature = (align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=false),
+        text_signature = "(align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=False)",
     )]
-    fn needleman_wunsch_2<'py>(
+    fn needleman_wunsch_merge_split<'py>(
         py: Python<'py>,
-        similarity_matrix: Bound<'py, PyAny>,
-        similarity_matrix_split: Bound<'py, PyAny>,
-        similarity_matrix_merge: Bound<'py, PyAny>,
+        align_scores: Bound<'py, PyAny>,
+        split_scores: Bound<'py, PyAny>,
+        merge_scores: Bound<'py, PyAny>,
         gap_penalty: f64,
-        gap_penalty_row: Option<f64>,
-        gap_penalty_col: Option<f64>,
+        insert_penalty: Option<f64>,
+        delete_penalty: Option<f64>,
         check_finite: bool,
-    ) -> PyResult<NeedlemanWunschResultType<'py>> {
-        let py_array = as_pyarray(py, &similarity_matrix)?;
-        let similarity_matrix = py_array.as_array();
+    ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
+        let py_array = as_pyarray(py, &align_scores)?;
+        let align_scores = py_array.as_array();
 
-        let py_array = as_pyarray(py, &similarity_matrix_split)?;
-        let similarity_matrix_split = py_array.as_array();
+        let py_array = as_pyarray(py, &split_scores)?;
+        let split_scores = py_array.as_array();
 
-        let py_array = as_pyarray(py, &similarity_matrix_merge)?;
-        let similarity_matrix_merge = py_array.as_array();
+        let py_array = as_pyarray(py, &merge_scores)?;
+        let merge_scores = py_array.as_array();
 
-        let gap_penalty_row = gap_penalty_row.unwrap_or(gap_penalty);
-        let gap_penalty_col = gap_penalty_col.unwrap_or(gap_penalty);
+        let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
+        let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
 
         if check_finite {
-            if !gap_penalty_row.is_finite() {
+            if !insert_penalty.is_finite() {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_row is non-finite",
+                    "insert_penalty is non-finite",
                 ));
             }
-            if !gap_penalty_col.is_finite() {
+            if !delete_penalty.is_finite() {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_col is non-finite",
+                    "delete_penalty is non-finite",
                 ));
             }
-            if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
+            if !align_scores.iter().all(|v: &f64| v.is_finite()) {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    "similarity_matrix contains non-finite values (NaN or Inf)",
+                    "align_scores contains non-finite values (NaN or Inf)",
+                ));
+            }
+            if !split_scores.iter().all(|v: &f64| v.is_finite()) {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "split_scores contains non-finite values (NaN or Inf)",
+                ));
+            }
+            if !merge_scores.iter().all(|v: &f64| v.is_finite()) {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "merge_scores contains non-finite values (NaN or Inf)",
                 ));
             }
         }
 
-        let (score, row_idx, col_idx) = nw2::needleman_wunsch_2(
-            &similarity_matrix,
-            &similarity_matrix_split,
-            &similarity_matrix_merge,
-            gap_penalty_row,
-            gap_penalty_col,
+        let (score, ops) = nw_merge_split::needleman_wunsch_merge_split(
+            align_scores,
+            split_scores,
+            merge_scores,
+            insert_penalty,
+            delete_penalty,
         );
 
-        Ok((score, row_idx.into_pyarray(py), col_idx.into_pyarray(py)))
+        let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
+        Ok((score, ops.into_pyarray(py)))
     }
 }

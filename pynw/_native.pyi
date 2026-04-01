@@ -95,13 +95,84 @@ def needleman_wunsch(
     """
     ...
 
-def needleman_wunsch_2(
-    similarity_matrix: npt.ArrayLike,
-    similarity_matrix_split: npt.ArrayLike,
-    similarity_matrix_merge: npt.ArrayLike,
+OP_ALIGN: int
+OP_INSERT: int
+OP_DELETE: int
+OP_SPLIT: int
+OP_MERGE: int
+
+def needleman_wunsch_merge_split(
+    align_scores: npt.ArrayLike,
+    split_scores: npt.ArrayLike,
+    merge_scores: npt.ArrayLike,
     *,
     gap_penalty: float = -1.0,
-    gap_penalty_row: float | None = None,
-    gap_penalty_col: float | None = None,
+    insert_penalty: float | None = None,
+    delete_penalty: float | None = None,
     check_finite: bool = False,
-) -> tuple[float, npt.NDArray[np.intp], npt.NDArray[np.intp]]: ...
+) -> tuple[float, npt.NDArray[np.uint8]]:
+    """Align two sequences with one-to-one, split (1→2), and merge (2→1) operations.
+
+    Extends Needleman-Wunsch with two additional edit operations: a row
+    element can be *split* to align with two consecutive column elements, or
+    two consecutive row elements can be *merged* to align with one column
+    element.  The score for each operation at each position is supplied by
+    the caller via separate score matrices.
+
+    Parameters
+    ----------
+    align_scores : array_like, shape (n, m)
+        ``align_scores[i, j]`` is the score for aligning row element *i*
+        with column element *j* (one-to-one match).
+    split_scores : array_like, shape (n, m-1)
+        ``split_scores[i, j]`` is the score for splitting row element *i*
+        across column elements *j* and *j+1* (one row → two columns).
+    merge_scores : array_like, shape (n-1, m)
+        ``merge_scores[i, j]`` is the score for merging row elements *i*
+        and *i+1* into column element *j* (two rows → one column).
+    gap_penalty : float, default -1.0
+        Penalty for an insert or delete step.  Use ``insert_penalty`` or
+        ``delete_penalty`` to set them independently.
+    insert_penalty : float, optional
+        Penalty for advancing the column sequence without consuming a row
+        element.  Defaults to ``gap_penalty``.
+    delete_penalty : float, optional
+        Penalty for advancing the row sequence without consuming a column
+        element.  Defaults to ``gap_penalty``.
+    check_finite : bool, default False
+        If ``True``, raise ``ValueError`` when any score matrix or penalty
+        contains ``NaN`` or ``Inf``.
+
+    Raises
+    ------
+    ValueError
+        If any score matrix is not 2-dimensional, or if ``check_finite``
+        is ``True`` and any value is non-finite.
+
+    Returns
+    -------
+    score : float
+        The optimal alignment score.
+    ops : ndarray of uint8, shape (k,)
+        Sequence of edit operations describing the alignment.  Each element
+        is one of the ``OP_*`` constants (or ``Op`` enum values).  Use
+        ``indices_from_ops`` to reconstruct the row and column indices.
+
+        +---------------+------------------------------------+
+        | Op            | Meaning                            |
+        +===============+====================================+
+        | ``OP_ALIGN``  | row[i] aligned with col[j]         |
+        | ``OP_INSERT`` | gap in row; col[j] consumed         |
+        | ``OP_DELETE`` | row[i] consumed; gap in col         |
+        | ``OP_SPLIT``  | row[i] split into col[j], col[j+1] |
+        | ``OP_MERGE``  | row[i], row[i+1] merged into col[j]|
+        +---------------+------------------------------------+
+
+    Notes
+    -----
+    Ties are broken deterministically: ``Align > Merge > Split > Delete > Insert``.
+
+    All score values and penalties must be finite.  Passing ``NaN`` or
+    ``Inf`` without ``check_finite=True`` is undefined behavior.
+    """
+    ...

@@ -6,8 +6,15 @@
 
 from importlib.metadata import version
 
-from pynw._native import needleman_wunsch, needleman_wunsch_2
+from pynw._native import needleman_wunsch, needleman_wunsch_merge_split
+from pynw._ops import Op, indices_from_ops
 
-__all__ = ["needleman_wunsch", "needleman_wunsch_2"]
 __docformat__ = "numpy"
 __version__ = version("pynw")
+
+__all__ = [
+    "needleman_wunsch",
+    "needleman_wunsch_merge_split",
+    "Op",
+    "indices_from_ops",
+]
