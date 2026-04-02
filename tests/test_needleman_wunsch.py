@@ -233,6 +233,71 @@ def test_special_matrices(matrix, expected_score, expected_ops) -> None:
     np.testing.assert_equal(ops, expected_ops)
 
 
+class TestGapPenalties:
+    def test_zero_gap_penalty(self) -> None:
+        score, ops = needleman_wunsch([[1.0, -1.0], [-1.0, 1.0]], gap_penalty=0.0)
+        assert score == 2.0
+        np.testing.assert_equal(ops, [EditOp.Align, EditOp.Align])
+
+    def test_positive_gap_penalty_rewards_gaps(self) -> None:
+        score, ops = needleman_wunsch([[0.0, 0.0], [0.0, 0.0]], gap_penalty=1.0)
+        assert score == 4.0
+        np.testing.assert_equal(
+            ops, [EditOp.Insert, EditOp.Insert, EditOp.Delete, EditOp.Delete]
+        )
+
+    def test_large_gap_penalty(self) -> None:
+        score, ops = needleman_wunsch([[0.0, 5.0], [5.0, 0.0]], gap_penalty=-100)
+        assert score == 0.0
+        np.testing.assert_equal(ops, [EditOp.Align, EditOp.Align])
+
+    def test_asymmetric_gap_penalties(self) -> None:
+        score, ops = needleman_wunsch(
+            [[-1.0, 2.0], [2.0, -1.0]], gap_penalty_source=-0.5, gap_penalty_target=-3.0
+        )
+        assert score == -1.5
+        np.testing.assert_equal(ops, [EditOp.Insert, EditOp.Align, EditOp.Delete])
+
+    def test_gap_penalty_source_overrides_default(self) -> None:
+        score, _ = needleman_wunsch(
+            np.empty((0, 2)), gap_penalty=-100, gap_penalty_source=-1.0
+        )
+        assert score == -2.0
+
+    def test_gap_penalty_target_overrides_default(self) -> None:
+        score, _ = needleman_wunsch(
+            np.empty((2, 0)), gap_penalty=-100, gap_penalty_target=-1.0
+        )
+        assert score == -2.0
+
+
+@st.composite
+def alignment_inputs(draw) -> tuple:
+    n = draw(st.integers(min_value=0, max_value=20))
+    m = draw(st.integers(min_value=0, max_value=20))
+    if n > 0 and m > 0:
+        matrix = draw(
+            st.lists(
+                st.lists(
+                    st.floats(min_value=-10, max_value=10, allow_nan=False),
+                    min_size=m,
+                    max_size=m,
+                ),
+                min_size=n,
+                max_size=n,
+            )
+        )
+    else:
+        matrix = np.empty((n, m))
+    gap_penalty_source = draw(
+        st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False)
+    )
+    gap_penalty_target = draw(
+        st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False)
+    )
+    return matrix, n, m, gap_penalty_source, gap_penalty_target
+
+
 @pytest.mark.hypothesis
 class TestStructuralInvariants:
     def assert_structural_invariants(self, ops, n, m):
@@ -245,27 +310,12 @@ class TestStructuralInvariants:
         assert len(ops) == num_align + num_delete + num_insert
         assert num_align <= min(n, m)
 
-    @given(
-        n=st.integers(min_value=0, max_value=20),
-        m=st.integers(min_value=0, max_value=20),
-        data=st.data(),
-    )
-    def test_random_matrix(self, n: int, m: int, data: st.DataObject) -> None:
-        matrix = (
-            data.draw(
-                st.lists(
-                    st.lists(
-                        st.floats(min_value=-10, max_value=10, allow_nan=False),
-                        min_size=m,
-                        max_size=m,
-                    ),
-                    min_size=n,
-                    max_size=n,
-                )
-            )
-            if n > 0 and m > 0
-            else np.empty((n, m))
+    @given(alignment_inputs())
+    def test_random_matrix(self, inputs: tuple) -> None:
+        matrix, n, m, gap_penalty_source, gap_penalty_target = inputs
+        _, ops = needleman_wunsch(
+            matrix,
+            gap_penalty_source=gap_penalty_source,
+            gap_penalty_target=gap_penalty_target,
         )
-
-        _, ops = needleman_wunsch(matrix)
         self.assert_structural_invariants(ops, n, m)
