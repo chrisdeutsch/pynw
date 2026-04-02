@@ -74,7 +74,7 @@ def needleman_wunsch(
     ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :],
     ...     match, mismatch,
     ... )
-    >>> score, source_idx, target_idx = needleman_wunsch(sm, gap_penalty=-1.0)
+    >>> score, ops = needleman_wunsch(sm, gap_penalty=-1.0)
     >>> score
     2.0
     >>> "".join(source_seq[i] if i >= 0 else "-" for i in source_idx)

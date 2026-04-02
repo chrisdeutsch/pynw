@@ -63,7 +63,7 @@ def iter_alignment(
     Parameters
     ----------
     ops : ndarray of uint8
-        Op sequence returned by ``needleman_wunsch``.
+        EditOp sequence returned by ``needleman_wunsch``.
     source_seq : sequence
         The source sequence passed to the aligner.
     target_seq : sequence
@@ -77,24 +77,6 @@ def iter_alignment(
         The source element consumed at this step, or ``None`` for an insert.
     target_item : element of target_seq, or None
         The target element consumed at this step, or ``None`` for a delete.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from pynw import needleman_wunsch
-    >>> from pynw._ops import iter_alignment
-    >>> source_seq = list("GATTACA")
-    >>> target_seq = list("GCATGCA")
-    >>> sm = np.where(
-    ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :], 1.0, -1.0
-    ... )
-    >>> score, source_idx, target_idx = needleman_wunsch(sm, gap_penalty=-1.0)
-    >>> aligned_source = "".join(source_seq[i] if i >= 0 else "-" for i in source_idx)
-    >>> aligned_target = "".join(target_seq[i] if i >= 0 else "-" for i in target_idx)
-    >>> aligned_source
-    'G-ATTACA'
-    >>> aligned_target
-    'GCA-TGCA'
     """
     source_iter = iter(source_sequence)
     target_iter = iter(target_sequence)

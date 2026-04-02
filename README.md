@@ -37,7 +37,7 @@ Align two DNA sequences using a simple match/mismatch scoring scheme:
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch
+from pynw import needleman_wunsch, iter_alignment
 
 seq1 = list("GATTACA")
 seq2 = list("GCATGCA")
@@ -47,18 +47,17 @@ similarity_matrix = np.where(
     np.array(seq1)[:, None] == np.array(seq2)[None, :], match, mismatch
 )
 
-score, source_idx, target_idx = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
-
-aligned1 = "".join(seq1[i] if i >= 0 else "-" for i in source_idx)
-aligned2 = "".join(seq2[i] if i >= 0 else "-" for i in target_idx)
+score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
+cols = [(s or "-", t or "-") for _, s, t in iter_alignment(ops, seq1, seq2)]
+aligned1, aligned2 = map("".join, zip(*cols))
 print(f"Score: {score}\n{aligned1}\n{aligned2}")
 # Score: 2.0
 # G-ATTACA
 # GCA-TGCA
 ```
 
-`source_idx` and `target_idx` map each alignment position to an index in the
-original sequence, with `-1` indicating a gap.
+`iter_alignment` yields `(op, source_item, target_item)` triples; items are
+`None` when that sequence has a gap at that position.
 
 ## Details
 
