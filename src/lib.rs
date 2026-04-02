@@ -75,23 +75,23 @@ mod pynw_native {
     /// ----------
     /// similarity_matrix : array_like, shape (n, m)
     ///     ``similarity_matrix[i, j]`` is the similarity score for aligning
-    ///     element *i* of the row sequence with element *j* of the column
+    ///     element *i* of the source sequence with element *j* of the target
     ///     sequence.
     /// gap_penalty : float, default -1.0
     ///     Penalty applied when a gap is inserted in either sequence.
-    ///     Use ``gap_penalty_row`` or ``gap_penalty_col`` to specify
+    ///     Use ``gap_penalty_source`` or ``gap_penalty_target`` to specify
     ///     different penalties for each sequence.
-    /// gap_penalty_row : float, optional
-    ///     Penalty added when a gap is inserted in the row sequence
-    ///     (the column sequence advances). This can be thought of as the
-    ///     cost of a deletion from the row sequence or an insertion into the
-    ///     column sequence.
+    /// gap_penalty_source : float, optional
+    ///     Penalty added when a gap is inserted in the source sequence
+    ///     (the target sequence advances). This can be thought of as the
+    ///     cost of a deletion from the source sequence or an insertion into the
+    ///     target sequence.
     ///     Defaults to ``gap_penalty`` if not specified.
-    /// gap_penalty_col : float, optional
-    ///     Penalty added when a gap is inserted in the column sequence
-    ///     (the row sequence advances). This can be thought of as the cost
-    ///     of a deletion from the column sequence or an insertion into the
-    ///     row sequence.
+    /// gap_penalty_target : float, optional
+    ///     Penalty added when a gap is inserted in the target sequence
+    ///     (the source sequence advances). This can be thought of as the cost
+    ///     of a deletion from the target sequence or an insertion into the
+    ///     source sequence.
     ///     Defaults to ``gap_penalty`` if not specified.
     /// check_finite : bool, default False
     ///     If ``True``, raise a ``ValueError`` when ``similarity_matrix``
@@ -108,11 +108,11 @@ mod pynw_native {
     /// -------
     /// score : float
     ///     The optimal alignment score.
-    /// row_idx : ndarray of intp
-    ///     Index into the row sequence at each alignment position, or ``-1``
+    /// source_idx : ndarray of intp
+    ///     Index into the source sequence at each alignment position, or ``-1``
     ///     for a gap.
-    /// col_idx : ndarray of intp
-    ///     Index into the column sequence at each alignment position, or ``-1``
+    /// target_idx : ndarray of intp
+    ///     Index into the target sequence at each alignment position, or ``-1``
     ///     for a gap.
     ///
     /// Examples
@@ -120,19 +120,19 @@ mod pynw_native {
     /// Align two DNA sequences using a simple match/mismatch scoring scheme:
     ///
     /// >>> import numpy as np
-    /// >>> row_seq = list("GATTACA")
-    /// >>> col_seq = list("GCATGCA")
+    /// >>> source_seq = list("GATTACA")
+    /// >>> target_seq = list("GCATGCA")
     /// >>> match, mismatch = 1.0, -1.0
     /// >>> sm = np.where(
-    /// ...     np.array(row_seq)[:, None] == np.array(col_seq)[None, :],
+    /// ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :],
     /// ...     match, mismatch,
     /// ... )
-    /// >>> score, row_idx, col_idx = needleman_wunsch(sm, gap_penalty=-1.0)
+    /// >>> score, source_idx, target_idx = needleman_wunsch(sm, gap_penalty=-1.0)
     /// >>> score
     /// 2.0
-    /// >>> "".join(row_seq[i] if i >= 0 else "-" for i in row_idx)
+    /// >>> "".join(source_seq[i] if i >= 0 else "-" for i in source_idx)
     /// 'G-ATTACA'
-    /// >>> "".join(col_seq[i] if i >= 0 else "-" for i in col_idx)
+    /// >>> "".join(target_seq[i] if i >= 0 else "-" for i in target_idx)
     /// 'GCA-TGCA'
     ///
     /// Notes
@@ -147,32 +147,32 @@ mod pynw_native {
     /// silently meaningless.
     #[pyfunction]
     #[pyo3(
-        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=false),
-        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=False)",
+        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=false),
+        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=False)",
     )]
     fn needleman_wunsch<'py>(
         py: Python<'py>,
         similarity_matrix: Bound<'py, PyAny>,
         gap_penalty: f64,
-        gap_penalty_row: Option<f64>,
-        gap_penalty_col: Option<f64>,
+        gap_penalty_source: Option<f64>,
+        gap_penalty_target: Option<f64>,
         check_finite: bool,
     ) -> PyResult<NeedlemanWunschResultType<'py>> {
         let py_array = as_pyarray(py, &similarity_matrix)?;
         let similarity_matrix = py_array.as_array();
 
-        let gap_penalty_row = gap_penalty_row.unwrap_or(gap_penalty);
-        let gap_penalty_col = gap_penalty_col.unwrap_or(gap_penalty);
+        let gap_penalty_source = gap_penalty_source.unwrap_or(gap_penalty);
+        let gap_penalty_target = gap_penalty_target.unwrap_or(gap_penalty);
 
         if check_finite {
-            if !gap_penalty_row.is_finite() {
+            if !gap_penalty_source.is_finite() {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_row is non-finite",
+                    "gap_penalty_source is non-finite",
                 ));
             }
-            if !gap_penalty_col.is_finite() {
+            if !gap_penalty_target.is_finite() {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_col is non-finite",
+                    "gap_penalty_target is non-finite",
                 ));
             }
             if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
@@ -182,10 +182,14 @@ mod pynw_native {
             }
         }
 
-        let (score, row_idx, col_idx) =
-            nw::needleman_wunsch(&similarity_matrix, gap_penalty_row, gap_penalty_col);
+        let (score, source_idx, target_idx) =
+            nw::needleman_wunsch(&similarity_matrix, gap_penalty_source, gap_penalty_target);
 
-        Ok((score, row_idx.into_pyarray(py), col_idx.into_pyarray(py)))
+        Ok((
+            score,
+            source_idx.into_pyarray(py),
+            target_idx.into_pyarray(py),
+        ))
     }
 
     // NOTE: This doc comment provides the runtime `help()` docstring.
