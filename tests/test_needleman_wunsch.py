@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from pynw import needleman_wunsch
 from pynw._ops import EditOp
@@ -231,6 +233,7 @@ def test_special_matrices(matrix, expected_score, expected_ops) -> None:
     np.testing.assert_equal(ops, expected_ops)
 
 
+@pytest.mark.hypothesis
 class TestStructuralInvariants:
     def assert_structural_invariants(self, ops, n, m):
         num_align = np.count_nonzero(ops == EditOp.Align)
@@ -242,27 +245,27 @@ class TestStructuralInvariants:
         assert len(ops) == num_align + num_delete + num_insert
         assert num_align <= min(n, m)
 
-    @pytest.mark.parametrize(
-        "shape",
-        [
-            (0, 0),
-            (0, 3),
-            (3, 0),
-            (1, 1),
-            (1, 5),
-            (5, 1),
-            (3, 3),
-            (3, 7),
-            (7, 3),
-            (10, 10),
-        ],
-        ids=lambda args: f"{args[0]}x{args[1]}",
+    @given(
+        n=st.integers(min_value=0, max_value=20),
+        m=st.integers(min_value=0, max_value=20),
+        data=st.data(),
     )
-    def test_random_matrix(self, shape):
-        rng = np.random.default_rng(abs(hash(shape)))
-
-        n, m = shape
-        matrix = rng.standard_normal((n, m))
+    def test_random_matrix(self, n: int, m: int, data: st.DataObject) -> None:
+        matrix = (
+            data.draw(
+                st.lists(
+                    st.lists(
+                        st.floats(min_value=-10, max_value=10, allow_nan=False),
+                        min_size=m,
+                        max_size=m,
+                    ),
+                    min_size=n,
+                    max_size=n,
+                )
+            )
+            if n > 0 and m > 0
+            else np.empty((n, m))
+        )
 
         _, ops = needleman_wunsch(matrix)
         self.assert_structural_invariants(ops, n, m)
