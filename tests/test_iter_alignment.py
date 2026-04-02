@@ -72,3 +72,24 @@ def test_iter_alignment(
         for (_, source, target) in iter_alignment(ops, source_sequence, target_sequence)
     )
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    "ops, source, target",
+    [
+        pytest.param(
+            [],
+            [0],
+            [0],
+            marks=pytest.mark.xfail(reason="Not implemented"),
+            id="short-ops",
+        ),
+        pytest.param([EditOp.Align], [], [0], id="short-source"),
+        pytest.param([EditOp.Align], [0], [], id="short-target"),
+    ],
+)
+def test_iter_alignment_strict(
+    ops: list[EditOp], source: list[int], target: list[int]
+) -> None:
+    with pytest.raises(ValueError):
+        list(iter_alignment(ops, source, target))

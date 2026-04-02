@@ -101,12 +101,17 @@ def iter_alignment(
 
     for op_uint in ops:
         op = EditOp(op_uint)
-        match op:
-            case EditOp.Align:
-                yield op, next(source_iter), next(target_iter)
-            case EditOp.Insert:
-                yield op, None, next(target_iter)
-            case EditOp.Delete:
-                yield op, next(source_iter), None
-            case _:
-                assert_never(op)
+        try:
+            match op:
+                case EditOp.Align:
+                    yield op, next(source_iter), next(target_iter)
+                case EditOp.Insert:
+                    yield op, None, next(target_iter)
+                case EditOp.Delete:
+                    yield op, next(source_iter), None
+                case _:
+                    assert_never(op)
+        except StopIteration:
+            raise ValueError(
+                "Length of source and/or target iterable does not match edit operations"
+            ) from None
