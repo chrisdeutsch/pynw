@@ -14,9 +14,9 @@ mod pynw_native {
 
     #[pymodule_init]
     fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        m.add("OP_ALIGN", nw_merge_split::EditOp::Align as u8)?;
-        m.add("OP_INSERT", nw_merge_split::EditOp::Insert as u8)?;
-        m.add("OP_DELETE", nw_merge_split::EditOp::Delete as u8)?;
+        m.add("OP_ALIGN", nw::EditOp::Align as u8)?;
+        m.add("OP_INSERT", nw::EditOp::Insert as u8)?;
+        m.add("OP_DELETE", nw::EditOp::Delete as u8)?;
         Ok(())
     }
 
