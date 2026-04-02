@@ -39,7 +39,7 @@ fastembed = "*"
 [feature.lint.dependencies]
 ruff = "*"
 mypy = "*"
-markdownlint-cli = ">=0.48.0,<0.49"
+markdownlint-cli = "*"
 prettier = "*"
 actionlint = "*"
 lefthook = "*"
