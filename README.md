@@ -15,9 +15,10 @@ sequences, or any domain where element order matters.
 
 ## Features
 
-- **Fast:** The alignment runs in $O(NM)$ time; a `1000x1000` matrix takes < 10ms on modern CPUs.
-- **NumPy-First:** The interface accepts NumPy arrays directly and requires no intermediate Python objects.
-- **Domain-Agnostic:** Operates on a precomputed similarity matrix, so any scoring function (e.g. distance metrics, semantic similarity) works out of the box.
+- **Fast:** Alignment runs in $O(nm)$ time; a `1000×1000` matrix takes <10 ms on modern CPUs.
+- **NumPy-first:** Accepts NumPy arrays directly — no intermediate Python objects.
+- **Domain-agnostic:** Operates on a precomputed similarity matrix, so any scoring function (distance metrics, semantic similarity, etc.) works out of the box.
+- **Asymmetric gaps:** Optionally set separate insert and delete penalties.
 
 ## Installation
 
@@ -75,26 +76,28 @@ $O(nm)$ memory even when the scoring rule could be expressed more compactly.
 
 ### Scoring
 
-The total alignment score is the sum of similarity matrix entries for matched
+The total alignment score is the sum of similarity-matrix entries for matched
 positions and gap penalties for insertions/deletions. Gap penalties are
-typically negative.
+typically negative. By default a single `gap_penalty` applies to both
+directions; set `insert_penalty` and/or `delete_penalty` to penalise them
+independently.
 
 When multiple alignments achieve the same optimal score, `pynw` breaks ties
 deterministically: `Diagonal > Up > Left`.
 
 ### Edit-distance parameterizations
 
-Needleman-Wunsch can reproduce common metrics with the right scoring
-parameters:
+Needleman-Wunsch can reproduce common metrics with the right similarity-matrix
+values and gap penalty:
 
-| Metric               | match | mismatch | gap      | NW score equals |
-| -------------------- | ----- | -------- | -------- | --------------- |
-| Levenshtein distance | 0     | -1       | -1       | `-distance`     |
-| Indel distance       | 0     | -2       | -1       | `-distance`     |
-| LCS length           | 1     | 0        | 0        | `lcs_length`    |
-| Hamming distance     | 0     | -1       | `-(n+1)` | `-distance`     |
+| Metric               | `S[i,j]` match | `S[i,j]` mismatch | `gap_penalty` | NW score equals |
+| -------------------- | -------------- | ----------------- | ------------- | --------------- |
+| Levenshtein distance | 0              | -1                | -1            | `-distance`     |
+| Indel distance       | 0              | -2                | -1            | `-distance`     |
+| LCS length           | 1              | 0                 | 0             | `lcs_length`    |
+| Hamming distance     | 0              | -1                | `-(n+1)`      | `-distance`     |
 
-For Hamming, strings must have equal length.
+For Hamming distance, strings must have equal length.
 
 ## API
 
