@@ -25,16 +25,26 @@
 
 use numpy::ndarray::{Array2, ArrayView2};
 
-const GAP: isize = -1;
-
 #[derive(Clone, Copy, Debug)]
-enum Direction {
-    /// Match/mismatch: both sequences advance.
-    Diagonal,
-    /// Gap in the target sequence: only the source sequence advances.
-    Up,
-    /// Gap in the source sequence: only the target sequence advances.
-    Left,
+#[repr(u8)]
+pub(crate) enum EditOp {
+    Align = 0,
+    Insert = 1,
+    Delete = 2,
+}
+
+pub(crate) fn needleman_wunsch(
+    similarity_matrix: ArrayView2<f64>,
+    gap_penalty_source: f64,
+    gap_penalty_target: f64,
+) -> (f64, Vec<EditOp>) {
+    let (n, m) = (similarity_matrix.nrows(), similarity_matrix.ncols());
+    let (dp, tb) = fill_matrices(similarity_matrix, gap_penalty_source, gap_penalty_target);
+    let ops = traceback_indices(tb.view());
+    let score = dp[[n, m]];
+
+    // TODO: Return array of scores?
+    (score, ops)
 }
 
 /// Build `(n+1, m+1)` DP score and traceback direction matrices.
@@ -43,39 +53,39 @@ enum Direction {
 /// but the `tb` matrix is still `O(nm)`.  True linear-space traceback
 /// requires Hirschberg's divide-and-conquer algorithm.
 fn fill_matrices(
-    similarity_matrix: &ArrayView2<f64>,
+    similarity_matrix: ArrayView2<f64>,
     gap_penalty_source: f64,
     gap_penalty_target: f64,
-) -> (Array2<f64>, Array2<Direction>) {
+) -> (Array2<f64>, Array2<EditOp>) {
     let (n, m) = (similarity_matrix.nrows(), similarity_matrix.ncols());
     let mut dp = Array2::<f64>::zeros((n + 1, m + 1));
-    let mut tb = Array2::from_elem((n + 1, m + 1), Direction::Diagonal);
+    let mut tb = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
     // First column: aligning i source-elements against nothing -> i target gaps.
     for i in 1..=n {
         dp[[i, 0]] = i as f64 * gap_penalty_target;
-        tb[[i, 0]] = Direction::Up;
+        tb[[i, 0]] = EditOp::Delete;
     }
     // First row: aligning j target-elements against nothing -> j source gaps.
     for j in 1..=m {
         dp[[0, j]] = j as f64 * gap_penalty_source;
-        tb[[0, j]] = Direction::Left;
+        tb[[0, j]] = EditOp::Insert;
     }
 
     for i in 1..=n {
         for j in 1..=m {
-            let diagonal = dp[[i - 1, j - 1]] + similarity_matrix[[i - 1, j - 1]];
-            let up = dp[[i - 1, j]] + gap_penalty_target;
-            let left = dp[[i, j - 1]] + gap_penalty_source;
+            let align = dp[[i - 1, j - 1]] + similarity_matrix[[i - 1, j - 1]];
+            let delete = dp[[i - 1, j]] + gap_penalty_target;
+            let insert = dp[[i, j - 1]] + gap_penalty_source;
 
             // Tie-breaking: diagonal > up > left. The cascade uses strict > so
             // that equal scores fall through to the higher-priority move.
-            let (score, best_direction) = if left > up && left > diagonal {
-                (left, Direction::Left)
-            } else if up > diagonal {
-                (up, Direction::Up)
+            let (score, best_direction) = if insert > delete && insert > align {
+                (insert, EditOp::Insert)
+            } else if delete > align {
+                (delete, EditOp::Delete)
             } else {
-                (diagonal, Direction::Diagonal)
+                (align, EditOp::Align)
             };
 
             dp[[i, j]] = score;
@@ -91,54 +101,35 @@ fn fill_matrices(
 /// Debug-asserts that the traceback never underflows.  This invariant is
 /// guaranteed by the boundary initialisation in [`fill_matrices`]:
 /// column 0 is always `Up` and row 0 is always `Left`.
-fn traceback_indices(traceback_matrix: &ArrayView2<Direction>) -> (Vec<isize>, Vec<isize>) {
+fn traceback_indices(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
     let (n, m) = (traceback_matrix.nrows() - 1, traceback_matrix.ncols() - 1);
 
-    let mut source_idx = Vec::with_capacity(n + m);
-    let mut target_idx = Vec::with_capacity(n + m);
+    let mut ops = Vec::with_capacity(n + m);
 
     let mut i = n;
     let mut j = m;
 
     while i > 0 || j > 0 {
-        match traceback_matrix[[i, j]] {
-            Direction::Diagonal => {
+        let op = traceback_matrix[[i, j]];
+        ops.push(op);
+
+        match op {
+            EditOp::Align => {
                 debug_assert!(i > 0 && j > 0, "Diagonal at boundary would underflow");
                 i -= 1;
                 j -= 1;
-                source_idx.push(i as isize);
-                target_idx.push(j as isize);
             }
-            Direction::Up => {
+            EditOp::Delete => {
                 debug_assert!(i > 0, "Up at row 0 would underflow");
                 i -= 1;
-                source_idx.push(i as isize);
-                target_idx.push(GAP);
             }
-            Direction::Left => {
+            EditOp::Insert => {
                 debug_assert!(j > 0, "Left at col 0 would underflow");
                 j -= 1;
-                source_idx.push(GAP);
-                target_idx.push(j as isize);
             }
         }
     }
 
-    source_idx.reverse();
-    target_idx.reverse();
-
-    (source_idx, target_idx)
-}
-
-pub(crate) fn needleman_wunsch(
-    similarity_matrix: &ArrayView2<f64>,
-    gap_penalty_source: f64,
-    gap_penalty_target: f64,
-) -> (f64, Vec<isize>, Vec<isize>) {
-    let (n, m) = (similarity_matrix.nrows(), similarity_matrix.ncols());
-    let (dp, tb) = fill_matrices(similarity_matrix, gap_penalty_source, gap_penalty_target);
-    let (source_idx, target_idx) = traceback_indices(&tb.view());
-    let score = dp[[n, m]];
-
-    (score, source_idx, target_idx)
+    ops.reverse();
+    ops
 }

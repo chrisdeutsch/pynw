@@ -42,12 +42,6 @@ fn as_pyarray<'py>(
     Ok(array)
 }
 
-type NeedlemanWunschResultType<'py> = (
-    f64,
-    Bound<'py, PyArray1<isize>>,
-    Bound<'py, PyArray1<isize>>,
-);
-
 #[pymodule(name = "_native")]
 mod pynw_native {
     use super::*;
@@ -57,8 +51,6 @@ mod pynw_native {
         m.add("OP_ALIGN", nw_merge_split::EditOp::Align as u8)?;
         m.add("OP_INSERT", nw_merge_split::EditOp::Insert as u8)?;
         m.add("OP_DELETE", nw_merge_split::EditOp::Delete as u8)?;
-        m.add("OP_SPLIT", nw_merge_split::EditOp::Split as u8)?;
-        m.add("OP_MERGE", nw_merge_split::EditOp::Merge as u8)?;
         Ok(())
     }
 
@@ -157,7 +149,7 @@ mod pynw_native {
         gap_penalty_source: Option<f64>,
         gap_penalty_target: Option<f64>,
         check_finite: bool,
-    ) -> PyResult<NeedlemanWunschResultType<'py>> {
+    ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
         let py_array = as_pyarray(py, &similarity_matrix)?;
         let similarity_matrix = py_array.as_array();
 
@@ -182,14 +174,11 @@ mod pynw_native {
             }
         }
 
-        let (score, source_idx, target_idx) =
-            nw::needleman_wunsch(&similarity_matrix, gap_penalty_source, gap_penalty_target);
+        let (score, ops) =
+            nw::needleman_wunsch(similarity_matrix, gap_penalty_source, gap_penalty_target);
 
-        Ok((
-            score,
-            source_idx.into_pyarray(py),
-            target_idx.into_pyarray(py),
-        ))
+        let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
+        Ok((score, ops.into_pyarray(py)))
     }
 
     // NOTE: This doc comment provides the runtime `help()` docstring.

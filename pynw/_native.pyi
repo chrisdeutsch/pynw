@@ -98,8 +98,6 @@ def needleman_wunsch(
 OP_ALIGN: int
 OP_INSERT: int
 OP_DELETE: int
-OP_SPLIT: int
-OP_MERGE: int
 
 def needleman_wunsch_merge_split(
     align_scores: npt.ArrayLike,

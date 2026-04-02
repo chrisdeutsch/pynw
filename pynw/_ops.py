@@ -1,42 +1,37 @@
 """Operation codes and index reconstruction for `needleman_wunsch_merge_split`."""
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator
 from enum import IntEnum
-from typing import TypeVar
+from typing import TypeVar, assert_never
 
 import numpy as np
 import numpy.typing as npt
 
-from pynw._native import OP_ALIGN, OP_DELETE, OP_INSERT, OP_MERGE, OP_SPLIT
-
-T = TypeVar("T")
-S = TypeVar("S")
+from pynw._native import OP_ALIGN, OP_DELETE, OP_INSERT
 
 
-class Op(IntEnum):
-    """Operation codes returned by `needleman_wunsch_merge_split`."""
+class EditOp(IntEnum):
+    """
+    Edit operation codes.
 
-    ALIGN = OP_ALIGN
-    INSERT = OP_INSERT
-    DELETE = OP_DELETE
-    SPLIT = OP_SPLIT
-    MERGE = OP_MERGE
+    Not guaranteed to be compatible between pynw version.
+    """
+
+    Align = OP_ALIGN
+    Insert = OP_INSERT
+    Delete = OP_DELETE
 
 
-_SOURCE_STRIDE = np.zeros(max(Op) + 1, dtype=np.intp)
-_SOURCE_STRIDE[Op.ALIGN] = 1
+_SOURCE_STRIDE = np.zeros(max(EditOp) + 1, dtype=np.intp)
+_SOURCE_STRIDE[EditOp.Align] = 1
 # INSERT = 0: no source element consumed
-_SOURCE_STRIDE[Op.DELETE] = 1
-_SOURCE_STRIDE[Op.SPLIT] = 1
-_SOURCE_STRIDE[Op.MERGE] = 2
+_SOURCE_STRIDE[EditOp.Delete] = 1
 _SOURCE_STRIDE.flags.writeable = False
 
-_TARGET_STRIDE = np.zeros(max(Op) + 1, dtype=np.intp)
-_TARGET_STRIDE[Op.ALIGN] = 1
-_TARGET_STRIDE[Op.INSERT] = 1
+_TARGET_STRIDE = np.zeros(max(EditOp) + 1, dtype=np.intp)
+_TARGET_STRIDE[EditOp.Align] = 1
+_TARGET_STRIDE[EditOp.Insert] = 1
 # DELETE = 0: no target element consumed
-_TARGET_STRIDE[Op.SPLIT] = 2
-_TARGET_STRIDE[Op.MERGE] = 1
 _TARGET_STRIDE.flags.writeable = False
 
 
@@ -49,11 +44,16 @@ def indices_from_ops(
     return source_idx, target_idx
 
 
+SourceType = TypeVar("SourceType")
+TargetType = TypeVar("TargetType")
+
+
+# TODO: Strict flag like zip?
 def iter_alignment(
     ops: npt.NDArray[np.uint8],
-    source_seq: Sequence[T],
-    target_seq: Sequence[S],
-) -> Iterator[tuple[Op, T | None, S | None]]:
+    source_sequence: Iterable[SourceType],
+    target_sequence: Iterable[TargetType],
+) -> Iterator[tuple[EditOp, SourceType | None, TargetType | None]]:
     """Iterate over a Needleman-Wunsch alignment step by step.
 
     Yields one ``(op, source_item, target_item)`` triple per alignment position.
@@ -96,16 +96,17 @@ def iter_alignment(
     >>> aligned_target
     'GCA-TGCA'
     """
-    ri, ci = 0, 0
-    for raw_op in ops:
-        op = Op(raw_op)
-        if op == Op.ALIGN:
-            yield op, source_seq[ri], target_seq[ci]
-            ri += 1
-            ci += 1
-        elif op == Op.INSERT:
-            yield op, None, target_seq[ci]
-            ci += 1
-        else:  # Op.DELETE
-            yield op, source_seq[ri], None
-            ri += 1
+    source_iter = iter(source_sequence)
+    target_iter = iter(target_sequence)
+
+    for op_uint in ops:
+        op = EditOp(op_uint)
+        match op:
+            case EditOp.Align:
+                yield op, next(source_iter), next(target_iter)
+            case EditOp.Insert:
+                yield op, None, next(target_iter)
+            case EditOp.Delete:
+                yield op, next(source_iter), None
+            case _:
+                assert_never(op)

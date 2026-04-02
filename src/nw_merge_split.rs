@@ -26,6 +26,7 @@ pub(crate) fn needleman_wunsch_merge_split(
     );
     let ops = traceback_ops(tb.view());
 
+    // TODO: Return array of scores?
     (score, ops)
 }
 
