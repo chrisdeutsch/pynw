@@ -42,22 +42,24 @@ from pynw import needleman_wunsch, iter_alignment
 seq1 = list("GATTACA")
 seq2 = list("GCATGCA")
 
-match, mismatch = 1.0, -1.0
+# Build an (n, m) similarity matrix: +1 for match, -1 for mismatch
 similarity_matrix = np.where(
-    np.array(seq1)[:, None] == np.array(seq2)[None, :], match, mismatch
+    np.array(seq1)[:, None] == np.array(seq2)[None, :], 1.0, -1.0
 )
 
 score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
-cols = [(s or "-", t or "-") for _, s, t in iter_alignment(ops, seq1, seq2)]
-aligned1, aligned2 = map("".join, zip(*cols))
+
+# iter_alignment yields (op, source_item, target_item); None signals a gap
+aligned1, aligned2 = "", ""
+for _, s, t in iter_alignment(ops, seq1, seq2):
+    aligned1 += s or "-"
+    aligned2 += t or "-"
+
 print(f"Score: {score}\n{aligned1}\n{aligned2}")
 # Score: 2.0
 # G-ATTACA
 # GCA-TGCA
 ```
-
-`iter_alignment` yields `(op, source_item, target_item)` triples; items are
-`None` when that sequence has a gap at that position.
 
 ## Details
 
