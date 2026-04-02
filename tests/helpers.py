@@ -3,36 +3,8 @@
 import numpy as np
 import numpy.typing as npt
 
-from pynw import indices_from_ops, needleman_wunsch
+from pynw import indices_from_ops
 from pynw._native import OP_DELETE, OP_INSERT
-
-
-def char_score_matrix(
-    s1: str,
-    s2: str,
-    match: float,
-    mismatch: float,
-) -> npt.NDArray[np.float64]:
-    """
-    Build a (len(s1), len(s2)) score matrix for two strings using match/mismatch
-    scoring.
-    """
-    return np.where(
-        np.array(list(s1))[:, None] == np.array(list(s2))[None, :], match, mismatch
-    )
-
-
-def nw_score(
-    s1: str,
-    s2: str,
-    match: float,
-    mismatch: float,
-    gap: float,
-) -> float:
-    """Return the NW optimal alignment score for two strings."""
-    sm = char_score_matrix(s1, s2, match, mismatch)
-    score, _ = needleman_wunsch(sm, gap_penalty_source=gap, gap_penalty_target=gap)
-    return score
 
 
 def ops_to_gap_indices(

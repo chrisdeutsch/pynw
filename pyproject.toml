@@ -53,7 +53,7 @@ markers = [
   "hypothesis: property-based tests (deselected by default, run with: pytest -m hypothesis)",
   "slow: slow tests such as embedding models (run with: pytest -m slow)",
 ]
-addopts = "--doctest-modules -m 'not hypothesis and not benchmark and not slow'"
+addopts = "--doctest-modules -m 'not benchmark and not slow'"
 
 [tool.ruff.lint]
 select = [
