@@ -57,38 +57,27 @@ class TestInputValidation:
         assert isinstance(score, float)
         assert score == expected_score
 
-    def test_check_finite_rejects_nan_in_matrix(self) -> None:
+    def test_rejects_nan_in_matrix(self) -> None:
         sm = np.array([[1.0, np.nan], [0.0, 1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, check_finite=True)
+            needleman_wunsch(sm)
 
-    def test_check_finite_rejects_inf_in_matrix(self) -> None:
+    def test_rejects_inf_in_matrix(self) -> None:
         sm = np.array([[1.0, np.inf], [0.0, 1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, check_finite=True)
+            needleman_wunsch(sm)
 
-    def test_check_finite_rejects_nan_gap_penalty(self) -> None:
+    def test_rejects_nan_gap_penalty(self) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, gap_penalty=float("nan"), check_finite=True)
+            needleman_wunsch(sm, gap_penalty=float("nan"))
 
-    def test_check_finite_rejects_inf_gap_penalty_source(self) -> None:
+    def test_rejects_inf_gap_penalty_source(self) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, gap_penalty_source=float("inf"), check_finite=True)
+            needleman_wunsch(sm, gap_penalty_source=float("inf"))
 
-    def test_check_finite_rejects_inf_gap_penalty_target(self) -> None:
+    def test_rejects_inf_gap_penalty_target(self) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, gap_penalty_target=float("inf"), check_finite=True)
-
-    def test_check_finite_false_allows_nan(self) -> None:
-        """Default check_finite=False does not raise on non-finite input."""
-        sm = np.array([[np.nan]])
-        # Should not raise
-        needleman_wunsch(sm, check_finite=False)
-
-    def test_check_finite_passes_for_valid_input(self) -> None:
-        sm = np.array([[1.0, -1.0], [-1.0, 1.0]])
-        score, _ = needleman_wunsch(sm, check_finite=True)
-        assert score == 2.0
+            needleman_wunsch(sm, gap_penalty_target=float("inf"))

@@ -51,15 +51,10 @@ mod pynw_native {
     ///     of a deletion from the target sequence or an insertion into the
     ///     source sequence.
     ///     Defaults to ``gap_penalty`` if not specified.
-    /// check_finite : bool, default True
-    ///     If ``True``, raise a ``ValueError`` when ``similarity_matrix``
-    ///     or the gap penalties contain ``NaN`` or ``Inf``.
-    ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``similarity_matrix`` is not 2-dimensional, or if
-    ///     ``check_finite`` is ``True`` and any value in
+    ///     If ``similarity_matrix`` is not 2-dimensional, or if any value in
     ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
     ///
     /// Returns
@@ -100,13 +95,10 @@ mod pynw_native {
     /// substitutions over gaps, producing compact alignments.  Other tools
     /// may return different co-optimal alignments.
     ///
-    /// All values in ``similarity_matrix`` and the gap penalties must be finite.
-    /// Passing ``NaN`` or ``Inf`` is undefined behavior — the output will be
-    /// silently meaningless.
     #[pyfunction]
     #[pyo3(
-        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=true),
-        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=True)",
+        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None),
+        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None)",
     )]
     fn needleman_wunsch<'py>(
         py: Python<'py>,
@@ -114,7 +106,6 @@ mod pynw_native {
         gap_penalty: f64,
         gap_penalty_source: Option<f64>,
         gap_penalty_target: Option<f64>,
-        check_finite: bool,
     ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
         let py_array = as_pyarray(py, &similarity_matrix)?;
         let similarity_matrix = py_array.as_array();
@@ -122,22 +113,20 @@ mod pynw_native {
         let gap_penalty_source = gap_penalty_source.unwrap_or(gap_penalty);
         let gap_penalty_target = gap_penalty_target.unwrap_or(gap_penalty);
 
-        if check_finite {
-            if !gap_penalty_source.is_finite() {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_source is non-finite",
-                ));
-            }
-            if !gap_penalty_target.is_finite() {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_target is non-finite",
-                ));
-            }
-            if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "similarity_matrix contains non-finite values (NaN or Inf)",
-                ));
-            }
+        if !gap_penalty_source.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "gap_penalty_source is non-finite",
+            ));
+        }
+        if !gap_penalty_target.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "gap_penalty_target is non-finite",
+            ));
+        }
+        if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "similarity_matrix contains non-finite values (NaN or Inf)",
+            ));
         }
 
         let (score, ops) =
@@ -180,15 +169,10 @@ mod pynw_native {
     /// delete_penalty : float, optional
     ///     Penalty for advancing the row sequence without consuming a column
     ///     element.  Defaults to ``gap_penalty``.
-    /// check_finite : bool, default True
-    ///     If ``True``, raise ``ValueError`` when any score matrix or penalty
-    ///     contains ``NaN`` or ``Inf``.
-    ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If any score matrix is not 2-dimensional, or if ``check_finite``
-    ///     is ``True`` and any value is non-finite.
+    ///     If any score matrix is not 2-dimensional, or if any value is non-finite.
     ///
     /// Returns
     /// -------
@@ -213,12 +197,10 @@ mod pynw_native {
     /// -----
     /// Ties are broken deterministically: ``Align > Merge > Split > Delete > Insert``.
     ///
-    /// All score values and penalties must be finite.  Passing ``NaN`` or
-    /// ``Inf`` without ``check_finite=True`` is undefined behavior.
     #[pyfunction]
     #[pyo3(
-        signature = (align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=true),
-        text_signature = "(align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=True)",
+        signature = (align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
+        text_signature = "(align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None)",
     )]
     #[allow(clippy::too_many_arguments)]
     fn needleman_wunsch_merge_split<'py>(
@@ -229,7 +211,6 @@ mod pynw_native {
         gap_penalty: f64,
         insert_penalty: Option<f64>,
         delete_penalty: Option<f64>,
-        check_finite: bool,
     ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
         let py_array = as_pyarray(py, &align_scores)?;
         let align_scores = py_array.as_array();
@@ -243,32 +224,30 @@ mod pynw_native {
         let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
         let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
 
-        if check_finite {
-            if !insert_penalty.is_finite() {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "insert_penalty is non-finite",
-                ));
-            }
-            if !delete_penalty.is_finite() {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "delete_penalty is non-finite",
-                ));
-            }
-            if !align_scores.iter().all(|v: &f64| v.is_finite()) {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "align_scores contains non-finite values (NaN or Inf)",
-                ));
-            }
-            if !split_scores.iter().all(|v: &f64| v.is_finite()) {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "split_scores contains non-finite values (NaN or Inf)",
-                ));
-            }
-            if !merge_scores.iter().all(|v: &f64| v.is_finite()) {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "merge_scores contains non-finite values (NaN or Inf)",
-                ));
-            }
+        if !insert_penalty.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "insert_penalty is non-finite",
+            ));
+        }
+        if !delete_penalty.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "delete_penalty is non-finite",
+            ));
+        }
+        if !align_scores.iter().all(|v: &f64| v.is_finite()) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "align_scores contains non-finite values (NaN or Inf)",
+            ));
+        }
+        if !split_scores.iter().all(|v: &f64| v.is_finite()) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "split_scores contains non-finite values (NaN or Inf)",
+            ));
+        }
+        if !merge_scores.iter().all(|v: &f64| v.is_finite()) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "merge_scores contains non-finite values (NaN or Inf)",
+            ));
         }
 
         let (score, ops) = nw_merge_split::needleman_wunsch_merge_split(

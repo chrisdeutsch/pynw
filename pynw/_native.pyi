@@ -15,7 +15,6 @@ def needleman_wunsch(
     gap_penalty: float = -1.0,
     gap_penalty_source: float | None = None,
     gap_penalty_target: float | None = None,
-    check_finite: bool = False,
 ) -> tuple[float, npt.NDArray[np.uint8]]:
     """Align two ordered sequences given a precomputed similarity matrix.
 
@@ -44,15 +43,11 @@ def needleman_wunsch(
         of a deletion from the target sequence or an insertion into the
         source sequence.
         Defaults to ``gap_penalty`` if not specified.
-    check_finite : bool, default False
-        If ``True``, raise a ``ValueError`` when ``similarity_matrix``
-        or the gap penalties contain ``NaN`` or ``Inf``.
 
     Raises
     ------
     ValueError
-        If ``similarity_matrix`` is not 2-dimensional, or if
-        ``check_finite`` is ``True`` and any value in
+        If ``similarity_matrix`` is not 2-dimensional, or if any value in
         ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
 
     Returns
@@ -98,8 +93,6 @@ def needleman_wunsch(
     may return different co-optimal alignments.
 
     All values in ``similarity_matrix`` and the gap penalties must be finite.
-    Passing ``NaN`` or ``Inf`` is undefined behavior — the output will be
-    silently meaningless.
     """
     ...
 
@@ -111,7 +104,6 @@ def needleman_wunsch_merge_split(
     gap_penalty: float = -1.0,
     insert_penalty: float | None = None,
     delete_penalty: float | None = None,
-    check_finite: bool = False,
 ) -> tuple[float, npt.NDArray[np.uint8]]:
     """Align two sequences with one-to-one, split (1→2), and merge (2→1) operations.
 
@@ -141,15 +133,11 @@ def needleman_wunsch_merge_split(
     delete_penalty : float, optional
         Penalty for advancing the source sequence without consuming a target
         element.  Defaults to ``gap_penalty``.
-    check_finite : bool, default False
-        If ``True``, raise ``ValueError`` when any score matrix or penalty
-        contains ``NaN`` or ``Inf``.
 
     Raises
     ------
     ValueError
-        If any score matrix is not 2-dimensional, or if ``check_finite``
-        is ``True`` and any value is non-finite.
+        If any score matrix is not 2-dimensional, or if any value is non-finite.
 
     Returns
     -------
@@ -174,7 +162,6 @@ def needleman_wunsch_merge_split(
     -----
     Ties are broken deterministically: ``Align > Merge > Split > Delete > Insert``.
 
-    All score values and penalties must be finite.  Passing ``NaN`` or
-    ``Inf`` without ``check_finite=True`` is undefined behavior.
+    All score values and penalties must be finite.
     """
     ...
