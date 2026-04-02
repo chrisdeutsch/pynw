@@ -60,6 +60,12 @@ def iter_alignment(
     ``source_item`` is ``None`` for an insert (gap in the source sequence);
     ``target_item`` is ``None`` for a delete (gap in the target sequence).
 
+    If the source or target sequence contains legitimate ``None`` values,
+    use the ``op`` field to distinguish gaps from real elements: a ``None``
+    source_item paired with ``EditOp.Insert`` is a gap, whereas a ``None``
+    paired with ``EditOp.Align`` or ``EditOp.Delete`` is a real sequence
+    element (and likewise for target_item).
+
     Parameters
     ----------
     ops : ndarray of uint8
