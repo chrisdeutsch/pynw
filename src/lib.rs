@@ -8,40 +8,6 @@ use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 mod nw;
 mod nw_merge_split;
 
-fn as_pyarray<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<PyReadonlyArray2<'py, f64>> {
-    // This is a modified version of the extract method of PyArrayLike to convert into a 2d f64 array
-
-    if let Ok(array) = obj.cast::<PyArray2<f64>>() {
-        // TODO: Check that array is C-contiguous?
-        return Ok(array.readonly());
-    }
-
-    static AS_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
-
-    let as_array = AS_ARRAY
-        .get_or_try_init(py, || {
-            get_array_module(py)?.getattr("asarray").map(Into::into)
-        })?
-        .bind(py);
-
-    let kwargs = PyDict::new(py);
-    kwargs.set_item(intern!(py, "dtype"), f64::get_dtype(py))?;
-
-    let array = as_array
-        .call((obj,), Some(kwargs).as_ref())?
-        .extract()
-        .map_err(|_| {
-            pyo3::exceptions::PyValueError::new_err(
-                "Cannot convert array-like into 2-dimensional float64 array",
-            )
-        })?;
-
-    Ok(array)
-}
-
 #[pymodule(name = "_native")]
 mod pynw_native {
     use super::*;
@@ -85,7 +51,7 @@ mod pynw_native {
     ///     of a deletion from the target sequence or an insertion into the
     ///     source sequence.
     ///     Defaults to ``gap_penalty`` if not specified.
-    /// check_finite : bool, default False
+    /// check_finite : bool, default True
     ///     If ``True``, raise a ``ValueError`` when ``similarity_matrix``
     ///     or the gap penalties contain ``NaN`` or ``Inf``.
     ///
@@ -139,8 +105,8 @@ mod pynw_native {
     /// silently meaningless.
     #[pyfunction]
     #[pyo3(
-        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=false),
-        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=False)",
+        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=true),
+        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None, check_finite=True)",
     )]
     fn needleman_wunsch<'py>(
         py: Python<'py>,
@@ -214,7 +180,7 @@ mod pynw_native {
     /// delete_penalty : float, optional
     ///     Penalty for advancing the row sequence without consuming a column
     ///     element.  Defaults to ``gap_penalty``.
-    /// check_finite : bool, default False
+    /// check_finite : bool, default True
     ///     If ``True``, raise ``ValueError`` when any score matrix or penalty
     ///     contains ``NaN`` or ``Inf``.
     ///
@@ -251,9 +217,10 @@ mod pynw_native {
     /// ``Inf`` without ``check_finite=True`` is undefined behavior.
     #[pyfunction]
     #[pyo3(
-        signature = (align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=false),
-        text_signature = "(align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=False)",
+        signature = (align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=true),
+        text_signature = "(align_scores, split_scores, merge_scores, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None, check_finite=True)",
     )]
+    #[allow(clippy::too_many_arguments)]
     fn needleman_wunsch_merge_split<'py>(
         py: Python<'py>,
         align_scores: Bound<'py, PyAny>,
@@ -315,4 +282,38 @@ mod pynw_native {
         let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
         Ok((score, ops.into_pyarray(py)))
     }
+}
+
+fn as_pyarray<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<PyReadonlyArray2<'py, f64>> {
+    // This is a modified version of the extract method of PyArrayLike to convert into a 2d f64 array
+
+    if let Ok(array) = obj.cast::<PyArray2<f64>>() {
+        // TODO: Check that array is C-contiguous?
+        return Ok(array.readonly());
+    }
+
+    static AS_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+
+    let as_array = AS_ARRAY
+        .get_or_try_init(py, || {
+            get_array_module(py)?.getattr("asarray").map(Into::into)
+        })?
+        .bind(py);
+
+    let kwargs = PyDict::new(py);
+    kwargs.set_item(intern!(py, "dtype"), f64::get_dtype(py))?;
+
+    let array = as_array
+        .call((obj,), Some(kwargs).as_ref())?
+        .extract()
+        .map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 2-dimensional float64 array",
+            )
+        })?;
+
+    Ok(array)
 }

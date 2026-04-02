@@ -53,7 +53,7 @@ pre-push:
   jobs:
     - name: cargo clippy
       glob: "*.rs"
-      run: cargo clippy --all-targets --all-features
+      run: cargo clippy --all-targets --all-features -- -Dwarnings
 
     - name: mypy
       glob: "*.{py,pyi}"

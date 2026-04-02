@@ -54,7 +54,7 @@ def iter_alignment(
     source_sequence: Iterable[SourceType],
     target_sequence: Iterable[TargetType],
 ) -> Iterator[tuple[EditOp, SourceType | None, TargetType | None]]:
-    """Iterate over a Needleman-Wunsch alignment step by step.
+    """Iterate over a Needleman-Wunsch alignment.
 
     Yields one ``(op, source_item, target_item)`` triple per alignment position.
     ``source_item`` is ``None`` for an insert (gap in the source sequence);

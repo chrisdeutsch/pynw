@@ -5,6 +5,10 @@
 import numpy as np
 import numpy.typing as npt
 
+OP_ALIGN: int
+OP_INSERT: int
+OP_DELETE: int
+
 def needleman_wunsch(
     similarity_matrix: npt.ArrayLike,
     *,
@@ -98,10 +102,6 @@ def needleman_wunsch(
     silently meaningless.
     """
     ...
-
-OP_ALIGN: int
-OP_INSERT: int
-OP_DELETE: int
 
 def needleman_wunsch_merge_split(
     align_scores: npt.ArrayLike,
