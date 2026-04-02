@@ -26,10 +26,17 @@ pre-commit:
       glob: "Cargo.toml"
       run: cargo check --locked
 
-    - name: markdownlint
+    - name: markdown
       glob: "*.md"
-      stage_fixed: true
-      run: markdownlint --fix {staged_files}
+      group:
+        piped: true
+        jobs:
+          - name: prettier
+            run: prettier --write {staged_files}
+            stage_fixed: true
+          - name: markdownlint
+            run: markdownlint --fix {staged_files}
+            stage_fixed: true
 
     - name: taplo
       glob: "*.toml"

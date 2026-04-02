@@ -87,7 +87,7 @@ Needleman-Wunsch can reproduce common metrics with the right scoring
 parameters:
 
 | Metric               | match | mismatch | gap      | NW score equals |
-|----------------------|-------|----------|----------|-----------------|
+| -------------------- | ----- | -------- | -------- | --------------- |
 | Levenshtein distance | 0     | -1       | -1       | `-distance`     |
 | Indel distance       | 0     | -2       | -1       | `-distance`     |
 | LCS length           | 1     | 0        | 0        | `lcs_length`    |

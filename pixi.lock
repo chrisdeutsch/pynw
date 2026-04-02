@@ -110,6 +110,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pillow-10.4.0-py312h56024de_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-26.0.1-pyh8b19718_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/prettier-3.8.1-h7e4c9f4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/protobuf-6.33.5-py312ha7b3241_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psutil-7.2.2-py312h5253ce2_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pthread-stubs-0.4-hb9d3cd8_1002.conda
@@ -246,6 +247,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pillow-10.4.0-py312h683ea77_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-26.0.1-pyh8b19718_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/prettier-3.8.1-h07b0e94_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/protobuf-6.33.5-py312hf5f8d9f_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/psutil-7.2.2-py312hf7082af_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pthread-stubs-0.4-h00291cd_1002.conda
@@ -381,6 +383,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pillow-10.4.0-py312h8609ca0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-26.0.1-pyh8b19718_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/prettier-3.8.1-h9907cc9_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/protobuf-6.33.5-py312h857ab9a_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psutil-7.2.2-py312hb3ab3e3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pthread-stubs-0.4-hd74edd7_1002.conda
@@ -505,6 +508,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pillow-10.4.0-py312h381445a_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-26.0.1-pyh8b19718_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/prettier-3.8.1-hc21fffc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/protobuf-6.33.5-py312hcb3287e_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/psutil-7.2.2-py312he5662c2_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pthread-stubs-0.4-h0e40799_1002.conda
@@ -3742,6 +3746,52 @@ packages:
   license_family: MIT
   size: 25877
   timestamp: 1764896838868
+- conda: https://conda.anaconda.org/conda-forge/linux-64/prettier-3.8.1-h7e4c9f4_0.conda
+  sha256: 11889a9e414f7c35dc0de59ce195b9b73e65881d5d3bbe7e2e14a59fe47d702e
+  md5: 206c0500b835e80dfee8e3ad2e5776ce
+  depends:
+  - nodejs
+  - __glibc >=2.17,<3.0.a0
+  - nodejs >=24.12.0,<25.0a0
+  license: MIT
+  license_family: MIT
+  size: 1104787
+  timestamp: 1769199236423
+- conda: https://conda.anaconda.org/conda-forge/osx-64/prettier-3.8.1-h07b0e94_0.conda
+  sha256: ffaa0423766c436525f02ca93c9159e1f4e718e3432cacc2dac9f826290b9c24
+  md5: 847c555170f38358a9266ec7cfd25a32
+  depends:
+  - nodejs
+  - __osx >=10.13
+  - nodejs >=24.12.0,<25.0a0
+  license: MIT
+  license_family: MIT
+  size: 1103408
+  timestamp: 1769199281565
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/prettier-3.8.1-h9907cc9_0.conda
+  sha256: b4494151f6f758c6d51973a8583fed7f63b186a1dc60e1e86b1dfe0add3e7b73
+  md5: d59831f8460836da00ae6441c054e61a
+  depends:
+  - nodejs
+  - __osx >=11.0
+  - nodejs >=24.12.0,<25.0a0
+  license: MIT
+  license_family: MIT
+  size: 1104682
+  timestamp: 1769199263346
+- conda: https://conda.anaconda.org/conda-forge/win-64/prettier-3.8.1-hc21fffc_0.conda
+  sha256: f35687664a25521b89fd11d1aebd016e10cdc02ccf188e89a718aa92613ab61c
+  md5: f88c1d3f2b79534a6f15b5c492afbae9
+  depends:
+  - nodejs
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  - nodejs >=24.12.0,<25.0a0
+  license: MIT
+  license_family: MIT
+  size: 1105954
+  timestamp: 1769199271969
 - conda: https://conda.anaconda.org/conda-forge/linux-64/protobuf-6.33.5-py312ha7b3241_2.conda
   sha256: 53997629b27a2465989f23e3a6212cfcc19f51c474d8f89905bb99859140ee88
   md5: 0aee4f9ff95fc4bc78264a93e2a74adf

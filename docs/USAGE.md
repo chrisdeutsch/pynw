@@ -57,7 +57,7 @@ A powerful use-case for sequence alignment is comparing drafts of documents wher
 Standard sequence alignment rewards exact matches and penalizes gaps (insertions/deletions). To adapt this for semantic comparisons, we use two tricks:
 
 1. **Shift the Scoring Matrix:** Cosine similarity yields values between `-1` and `1`. By defining a matching threshold (e.g., `0.65`) and subtracting it from the similarities, good matches become positive scores, and poor matches become negative scores.
-2. **Zero Gap Penalties:** By setting gap penalties to `0.0`, there is no inherent punishment for skipping a sentence. The algorithm will strictly prefer to align sentences *only* if their similarity is above the threshold (since that's the only way to increase the total score), elegantly handling completely new or deleted paragraphs.
+2. **Zero Gap Penalties:** By setting gap penalties to `0.0`, there is no inherent punishment for skipping a sentence. The algorithm will strictly prefer to align sentences _only_ if their similarity is above the threshold (since that's the only way to increase the total score), elegantly handling completely new or deleted paragraphs.
 
 Here we use the lightweight, CPU-friendly [`fastembed`](https://qdrant.github.io/fastembed/) library to compute cosine similarities to construct our score matrix.
 
