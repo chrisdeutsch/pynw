@@ -57,7 +57,7 @@ mod pynw_native {
     ///     The optimal alignment score.
     /// ops : ndarray of uint8, shape (k,)
     ///     Sequence of edit operations describing the alignment.  Each element
-    ///     is one of ``OP_ALIGN``, ``OP_INSERT``, or ``OP_DELETE``.  Use
+    ///     is of type ``EditOp``.  Use
     ///     ``iter_alignment`` to iterate over aligned element pairs, or
     ///     ``indices_from_ops`` to reconstruct source and target index arrays.
     ///
