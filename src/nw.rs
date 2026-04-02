@@ -9,9 +9,9 @@
 //!
 //! ```text
 //! dp[i][j] = max(
-//!     dp[i-1][j-1] + S[i-1][j-1],        // diagonal - match/mismatch
-//!     dp[i-1][j]   + gap_penalty_target,  // up       - gap in target sequence
-//!     dp[i][j-1]   + gap_penalty_source,  // left     - gap in source sequence
+//!     dp[i-1][j-1] + S[i-1][j-1],   // diagonal - match/mismatch
+//!     dp[i-1][j]   + delete_penalty, // up       - gap in target sequence
+//!     dp[i][j-1]   + insert_penalty, // left     - gap in source sequence
 //! )
 //! ```
 //!

@@ -40,5 +40,3 @@ jobs:
         run: pixi run cargo test
       - name: pytest
         run: pixi run test
-      - name: pytest (hypothesis)
-        run: pixi run test-hypothesis

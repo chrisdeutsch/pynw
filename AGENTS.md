@@ -20,6 +20,5 @@ Requires `pixi` (see `pixi.toml`).
 
 - `pixi run build`: compile extension (`maturin develop --release`)
 - `pixi run test`: run pytest (builds first)
-- `pixi run test-hypothesis`: run hypothesis property tests only
 - `pixi run lint`: run pre-commit hooks (ruff, cargo fmt, markdownlint, taplo)
 - `pixi run check`: run pre-push hooks (clippy, mypy)

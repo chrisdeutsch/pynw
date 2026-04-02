@@ -13,8 +13,8 @@ def needleman_wunsch(
     similarity_matrix: npt.ArrayLike,
     *,
     gap_penalty: float = -1.0,
-    gap_penalty_source: float | None = None,
-    gap_penalty_target: float | None = None,
+    insert_penalty: float | None = None,
+    delete_penalty: float | None = None,
 ) -> tuple[float, npt.NDArray[np.uint8]]:
     """Align two ordered sequences given a precomputed similarity matrix.
 
@@ -29,20 +29,14 @@ def needleman_wunsch(
         sequence.
     gap_penalty : float, default -1.0
         Penalty applied when a gap is inserted in either sequence.
-        Use ``gap_penalty_source`` or ``gap_penalty_target`` to specify
-        different penalties for each sequence.
-    gap_penalty_source : float, optional
-        Penalty added when a gap is inserted in the source sequence
-        (the target sequence advances). This can be thought of as the
-        cost of a deletion from the source sequence or an insertion into the
-        target sequence.
-        Defaults to ``gap_penalty`` if not specified.
-    gap_penalty_target : float, optional
-        Penalty added when a gap is inserted in the target sequence
-        (the source sequence advances). This can be thought of as the cost
-        of a deletion from the target sequence or an insertion into the
-        source sequence.
-        Defaults to ``gap_penalty`` if not specified.
+        Use ``insert_penalty`` or ``delete_penalty`` to set them
+        independently.
+    insert_penalty : float, optional
+        Penalty for advancing the target sequence without consuming a source
+        element (gap in source).  Defaults to ``gap_penalty``.
+    delete_penalty : float, optional
+        Penalty for advancing the source sequence without consuming a target
+        element (gap in target).  Defaults to ``gap_penalty``.
 
     Raises
     ------

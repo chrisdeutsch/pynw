@@ -85,15 +85,15 @@ class TestInputValidation:
         with pytest.raises(ValueError, match=r"non-finite"):
             needleman_wunsch(sm, gap_penalty=float("nan"))
 
-    def test_rejects_inf_gap_penalty_source(self) -> None:
+    def test_rejects_inf_insert_penalty(self) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, gap_penalty_source=float("inf"))
+            needleman_wunsch(sm, insert_penalty=float("inf"))
 
-    def test_rejects_inf_gap_penalty_target(self) -> None:
+    def test_rejects_inf_delete_penalty(self) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, gap_penalty_target=float("inf"))
+            needleman_wunsch(sm, delete_penalty=float("inf"))
 
 
 class TestEmptyAndDegenerateMatrices:
@@ -253,20 +253,20 @@ class TestGapPenalties:
 
     def test_asymmetric_gap_penalties(self) -> None:
         score, ops = needleman_wunsch(
-            [[-1.0, 2.0], [2.0, -1.0]], gap_penalty_source=-0.5, gap_penalty_target=-3.0
+            [[-1.0, 2.0], [2.0, -1.0]], insert_penalty=-0.5, delete_penalty=-3.0
         )
         assert score == -1.5
         np.testing.assert_equal(ops, [EditOp.Insert, EditOp.Align, EditOp.Delete])
 
-    def test_gap_penalty_source_overrides_default(self) -> None:
+    def test_insert_penalty_overrides_default(self) -> None:
         score, _ = needleman_wunsch(
-            np.empty((0, 2)), gap_penalty=-100, gap_penalty_source=-1.0
+            np.empty((0, 2)), gap_penalty=-100, insert_penalty=-1.0
         )
         assert score == -2.0
 
-    def test_gap_penalty_target_overrides_default(self) -> None:
+    def test_delete_penalty_overrides_default(self) -> None:
         score, _ = needleman_wunsch(
-            np.empty((2, 0)), gap_penalty=-100, gap_penalty_target=-1.0
+            np.empty((2, 0)), gap_penalty=-100, delete_penalty=-1.0
         )
         assert score == -2.0
 
@@ -289,13 +289,13 @@ def alignment_inputs(draw) -> tuple:
         )
     else:
         matrix = np.empty((n, m))
-    gap_penalty_source = draw(
+    insert_penalty = draw(
         st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False)
     )
-    gap_penalty_target = draw(
+    delete_penalty = draw(
         st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False)
     )
-    return matrix, n, m, gap_penalty_source, gap_penalty_target
+    return matrix, n, m, insert_penalty, delete_penalty
 
 
 @pytest.mark.hypothesis
@@ -312,10 +312,10 @@ class TestStructuralInvariants:
 
     @given(alignment_inputs())
     def test_random_matrix(self, inputs: tuple) -> None:
-        matrix, n, m, gap_penalty_source, gap_penalty_target = inputs
+        matrix, n, m, insert_penalty, delete_penalty = inputs
         _, ops = needleman_wunsch(
             matrix,
-            gap_penalty_source=gap_penalty_source,
-            gap_penalty_target=gap_penalty_target,
+            insert_penalty=insert_penalty,
+            delete_penalty=delete_penalty,
         )
         self.assert_structural_invariants(ops, n, m)

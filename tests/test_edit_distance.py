@@ -129,7 +129,7 @@ class TestWeightedLevenshteinProperty:
         expected = -Levenshtein.distance(s1, s2, weights=weights)
         sm = char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
         score, _ = needleman_wunsch(
-            sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
+            sm, insert_penalty=-weights[0], delete_penalty=-weights[1]
         )
         assert score == expected
 
@@ -139,7 +139,7 @@ class TestWeightedLevenshteinProperty:
         expected = -Levenshtein.distance(s1, s2, weights=weights)
         sm = char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
         score, _ = needleman_wunsch(
-            sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
+            sm, insert_penalty=-weights[0], delete_penalty=-weights[1]
         )
         assert score == expected
 
@@ -149,7 +149,7 @@ class TestWeightedLevenshteinProperty:
         expected = -Levenshtein.distance(s1, s2, weights=weights)
         sm = char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
         score, _ = needleman_wunsch(
-            sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
+            sm, insert_penalty=-weights[0], delete_penalty=-weights[1]
         )
         assert score == expected
 

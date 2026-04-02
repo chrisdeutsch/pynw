@@ -37,20 +37,14 @@ mod pynw_native {
     ///     sequence.
     /// gap_penalty : float, default -1.0
     ///     Penalty applied when a gap is inserted in either sequence.
-    ///     Use ``gap_penalty_source`` or ``gap_penalty_target`` to specify
-    ///     different penalties for each sequence.
-    /// gap_penalty_source : float, optional
-    ///     Penalty added when a gap is inserted in the source sequence
-    ///     (the target sequence advances). This can be thought of as the
-    ///     cost of a deletion from the source sequence or an insertion into the
-    ///     target sequence.
-    ///     Defaults to ``gap_penalty`` if not specified.
-    /// gap_penalty_target : float, optional
-    ///     Penalty added when a gap is inserted in the target sequence
-    ///     (the source sequence advances). This can be thought of as the cost
-    ///     of a deletion from the target sequence or an insertion into the
-    ///     source sequence.
-    ///     Defaults to ``gap_penalty`` if not specified.
+    ///     Use ``insert_penalty`` or ``delete_penalty`` to set them
+    ///     independently.
+    /// insert_penalty : float, optional
+    ///     Penalty for advancing the target sequence without consuming a source
+    ///     element (gap in source).  Defaults to ``gap_penalty``.
+    /// delete_penalty : float, optional
+    ///     Penalty for advancing the source sequence without consuming a target
+    ///     element (gap in target).  Defaults to ``gap_penalty``.
     /// Raises
     /// ------
     /// ValueError
@@ -101,30 +95,30 @@ mod pynw_native {
     ///
     #[pyfunction]
     #[pyo3(
-        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None),
-        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_source=None, gap_penalty_target=None)",
+        signature = (similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
+        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None)",
     )]
     fn needleman_wunsch<'py>(
         py: Python<'py>,
         similarity_matrix: Bound<'py, PyAny>,
         gap_penalty: f64,
-        gap_penalty_source: Option<f64>,
-        gap_penalty_target: Option<f64>,
+        insert_penalty: Option<f64>,
+        delete_penalty: Option<f64>,
     ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
         let py_array = as_pyarray(py, &similarity_matrix)?;
         let similarity_matrix = py_array.as_array();
 
-        let gap_penalty_source = gap_penalty_source.unwrap_or(gap_penalty);
-        let gap_penalty_target = gap_penalty_target.unwrap_or(gap_penalty);
+        let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
+        let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
 
-        if !gap_penalty_source.is_finite() {
+        if !insert_penalty.is_finite() {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "gap_penalty_source is non-finite",
+                "insert_penalty is non-finite",
             ));
         }
-        if !gap_penalty_target.is_finite() {
+        if !delete_penalty.is_finite() {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "gap_penalty_target is non-finite",
+                "delete_penalty is non-finite",
             ));
         }
         if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
@@ -133,8 +127,7 @@ mod pynw_native {
             ));
         }
 
-        let (score, ops) =
-            nw::needleman_wunsch(similarity_matrix, gap_penalty_source, gap_penalty_target);
+        let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
 
         let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
         Ok((score, ops.into_pyarray(py)))
