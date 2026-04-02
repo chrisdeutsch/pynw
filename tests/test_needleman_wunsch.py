@@ -2,6 +2,17 @@ import numpy as np
 import pytest
 
 from pynw import needleman_wunsch
+from pynw._ops import EditOp
+
+
+def test_return_types() -> None:
+    score, ops = needleman_wunsch(np.eye(3, dtype=np.float64))
+    assert isinstance(score, float)
+    assert isinstance(ops, np.ndarray)
+    assert ops.dtype == np.uint8
+
+    assert score == 3.0
+    np.testing.assert_equal(ops, [EditOp.Align, EditOp.Align, EditOp.Align])
 
 
 class TestInputValidation:
@@ -52,7 +63,7 @@ class TestInputValidation:
             ),
         ],
     )
-    def test_casts(self, similarity_matrix, expected_score):
+    def test_casts(self, similarity_matrix, expected_score) -> None:
         score, _ = needleman_wunsch(similarity_matrix)
         assert isinstance(score, float)
         assert score == expected_score
@@ -81,3 +92,177 @@ class TestInputValidation:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
             needleman_wunsch(sm, gap_penalty_target=float("inf"))
+
+
+class TestEmptyAndDegenerateMatrices:
+    @pytest.mark.parametrize(
+        "similarity_matrix, expected_score, expected_ops",
+        [
+            pytest.param(np.empty((0, 0)), 0.0, [], id="0x0"),
+            pytest.param(np.empty((0, 1)), -1.0, [EditOp.Insert], id="0x1"),
+            pytest.param(np.empty((1, 0)), -1.0, [EditOp.Delete], id="1x0"),
+        ],
+    )
+    def test_empty_dim(self, similarity_matrix, expected_score, expected_ops) -> None:
+        score, ops = needleman_wunsch(similarity_matrix)
+        assert score == expected_score
+        np.testing.assert_equal(ops, expected_ops)
+
+    def test_1x1(self) -> None:
+        score, ops = needleman_wunsch([[5.0]])
+        assert score == 5.0
+        np.testing.assert_equal(ops, [EditOp.Align])
+
+    def test_1x1_no_align(self) -> None:
+        score, ops = needleman_wunsch([[-5.0]], gap_penalty=0.0)
+        assert score == 0.0
+        # The DP fill at [1, 1] is a tie between insert and delete. Therefore,
+        # it is deterministically broken and filled with delete. Then the
+        # traceback yields [delete, insert], which has to be reversed to give
+        # the result of [insert, delete].
+        np.testing.assert_equal(ops, [EditOp.Insert, EditOp.Delete])
+
+
+@pytest.mark.parametrize(
+    "matrix, expected_score, expected_ops",
+    [
+        pytest.param(
+            [[3.0, 2.0, 1.0]],
+            1.0,
+            [EditOp.Align, EditOp.Insert, EditOp.Insert],
+            id="wide-1",
+        ),
+        pytest.param(
+            [[3.0], [2.0], [1.0]],
+            1.0,
+            [EditOp.Align, EditOp.Delete, EditOp.Delete],
+            id="tall-1",
+        ),
+        pytest.param(
+            [[1.0, 2.0, 3.0]],
+            1.0,
+            [EditOp.Insert, EditOp.Insert, EditOp.Align],
+            id="wide-2",
+        ),
+        pytest.param(
+            [[1.0], [2.0], [3.0]],
+            1.0,
+            [EditOp.Delete, EditOp.Delete, EditOp.Align],
+            id="tall-2",
+        ),
+    ],
+)
+def test_rectangular_matrices(matrix, expected_score, expected_ops) -> None:
+    score, ops = needleman_wunsch(matrix)
+    assert score == expected_score
+    np.testing.assert_equal(ops, expected_ops)
+
+
+@pytest.mark.parametrize(
+    "matrix, expected_ops",
+    [
+        pytest.param(
+            [[0.0]],
+            [EditOp.Align],
+            id="all-tied",
+        ),
+        pytest.param(
+            [[-1.0]],
+            [EditOp.Insert, EditOp.Delete],
+            id="insert-delete-tied",
+        ),
+    ],
+)
+def test_tie_breaking(matrix, expected_ops) -> None:
+    _, ops = needleman_wunsch(matrix, gap_penalty=0.0)
+    np.testing.assert_equal(ops, expected_ops)
+
+
+@pytest.mark.parametrize(
+    "matrix, expected_score, expected_ops",
+    [
+        pytest.param(
+            np.eye(3),
+            3.0,
+            3 * [EditOp.Align],
+            id="identity",
+        ),
+        pytest.param(
+            np.zeros((3, 3)),
+            0.0,
+            3 * [EditOp.Align],
+            id="zeros",
+        ),
+        pytest.param(
+            np.ones((3, 3)),
+            3.0,
+            3 * [EditOp.Align],
+            id="ones",
+        ),
+        pytest.param(
+            np.full((3, 3), -5.0),
+            -6.0,
+            3 * [EditOp.Insert] + 3 * [EditOp.Delete],
+            id="negative",
+        ),
+        pytest.param(
+            [[0.0, 10.0, 0.0], [0.0, 0.0, 10.0], [0.0, 0.0, 0.0]],
+            18.0,
+            [EditOp.Insert, EditOp.Align, EditOp.Align, EditOp.Delete],
+            id="off-diagonal",
+        ),
+        pytest.param(
+            [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [100.0, 0.0, 0.0]],
+            96.0,
+            [EditOp.Delete, EditOp.Delete, EditOp.Align, EditOp.Insert, EditOp.Insert],
+            id="large-bottom-left",
+        ),
+        pytest.param(
+            [[0.0, 0.0, 100.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+            96.0,
+            [EditOp.Insert, EditOp.Insert, EditOp.Align, EditOp.Delete, EditOp.Delete],
+            id="large-top-right",
+        ),
+    ],
+)
+def test_special_matrices(matrix, expected_score, expected_ops) -> None:
+    score, ops = needleman_wunsch(matrix)
+    assert score == expected_score
+    np.testing.assert_equal(ops, expected_ops)
+
+
+class TestStructuralInvariants:
+    def assert_structural_invariants(self, ops, n, m):
+        num_align = np.count_nonzero(ops == EditOp.Align)
+        num_delete = np.count_nonzero(ops == EditOp.Delete)
+        num_insert = np.count_nonzero(ops == EditOp.Insert)
+
+        assert num_align + num_delete == n
+        assert num_align + num_insert == m
+        assert len(ops) == num_align + num_delete + num_insert
+        assert num_align <= min(n, m)
+
+    @pytest.mark.parametrize(
+        "shape",
+        [
+            (0, 0),
+            (0, 3),
+            (3, 0),
+            (1, 1),
+            (1, 5),
+            (5, 1),
+            (3, 3),
+            (3, 7),
+            (7, 3),
+            (10, 10),
+        ],
+        ids=lambda args: f"{args[0]}x{args[1]}",
+    )
+    def test_random_matrix(self, shape):
+        rng = np.random.default_rng(abs(hash(shape)))
+
+        n, m = shape
+        matrix = rng.standard_normal((n, m))
+
+        _, ops = needleman_wunsch(matrix)
+        self.assert_structural_invariants(ops, n, m)
