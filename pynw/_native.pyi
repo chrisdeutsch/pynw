@@ -12,7 +12,7 @@ def needleman_wunsch(
     gap_penalty_source: float | None = None,
     gap_penalty_target: float | None = None,
     check_finite: bool = False,
-) -> tuple[float, npt.NDArray[np.intp], npt.NDArray[np.intp]]:
+) -> tuple[float, npt.NDArray[np.uint8]]:
     """Align two ordered sequences given a precomputed similarity matrix.
 
     The total alignment score is the sum of similarity-matrix entries for
@@ -55,12 +55,11 @@ def needleman_wunsch(
     -------
     score : float
         The optimal alignment score.
-    source_idx : ndarray of intp
-        Index into the source sequence at each alignment position, or ``-1``
-        for a gap.
-    target_idx : ndarray of intp
-        Index into the target sequence at each alignment position, or ``-1``
-        for a gap.
+    ops : ndarray of uint8, shape (k,)
+        Sequence of edit operations describing the alignment.  Each element
+        is one of ``OP_ALIGN``, ``OP_INSERT``, or ``OP_DELETE``.  Use
+        ``iter_alignment`` to iterate over aligned element pairs, or
+        ``indices_from_ops`` to reconstruct source and target index arrays.
 
     Examples
     --------
@@ -74,12 +73,17 @@ def needleman_wunsch(
     ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :],
     ...     match, mismatch,
     ... )
+    >>> from pynw import iter_alignment
     >>> score, ops = needleman_wunsch(sm, gap_penalty=-1.0)
     >>> score
     2.0
-    >>> "".join(source_seq[i] if i >= 0 else "-" for i in source_idx)
+    >>> cols = [
+    ...     (s or "-", t or "-")
+    ...     for _, s, t in iter_alignment(ops, source_seq, target_seq)
+    ... ]
+    >>> "".join(s for s, _ in cols)
     'G-ATTACA'
-    >>> "".join(target_seq[i] if i >= 0 else "-" for i in target_idx)
+    >>> "".join(t for _, t in cols)
     'GCA-TGCA'
 
     Notes

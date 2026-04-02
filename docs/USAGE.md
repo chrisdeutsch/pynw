@@ -8,7 +8,7 @@ without a close match are gapped, so you can see which entries were dropped.
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch
+from pynw import needleman_wunsch, iter_alignment
 from rapidfuzz.process import cdist
 from rapidfuzz.fuzz import ratio
 
@@ -29,12 +29,12 @@ target_seq = np.array([
 ])
 
 score = cdist(source_seq, target_seq, scorer=ratio) / 100
-_, source_idx, target_idx = needleman_wunsch(score)
-source_items = np.where(source_idx >= 0, source_seq[source_idx], "GAP")
-target_items = np.where(target_idx >= 0, target_seq[target_idx], "GAP")
+_, ops = needleman_wunsch(score)
 
-for source_item, target_item in zip(source_items, target_items):
-    print(f"{source_item:40} -> {target_item}")
+for _, source_item, target_item in iter_alignment(ops, source_seq, target_seq):
+    s = source_item if source_item is not None else "GAP"
+    t = target_item if target_item is not None else "GAP"
+    print(f"{s:40} -> {t}")
 ```
 
 Expected output:
@@ -68,7 +68,7 @@ uv pip install fastembed numpy
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch
+from pynw import needleman_wunsch, iter_alignment
 from fastembed import TextEmbedding
 
 # Initialize the embedding model
@@ -111,19 +111,19 @@ similarity_matrix = cosine_sim - threshold
 # 4. Run alignment
 # We set gap penalties to 0.0. The algorithm will naturally align sentences
 # that score > 0 (similarity > threshold), and insert gaps otherwise.
-score, source_idx, target_idx = needleman_wunsch(similarity_matrix, gap_penalty=0.0)
+_, ops = needleman_wunsch(similarity_matrix, gap_penalty=0.0)
 
 # 5. Print the Semantic Diff
 print("--- Semantic Document Diff ---\n")
-for i1, i2 in zip(source_idx, target_idx):
-    if i1 >= 0 and i2 >= 0:
+for _, i1, i2 in iter_alignment(ops, range(len(draft)), range(len(final_rev))):
+    if i1 is not None and i2 is not None:
         print(f"[ MATCH ] (sim: {cosine_sim[i1, i2]:.2f})")
         print(f"  - {draft[i1]}")
         print(f"  + {final_rev[i2]}\n")
-    elif i1 >= 0:
+    elif i1 is not None:
         print(f"[ DELETED ]")
         print(f"  - {draft[i1]}\n")
-    elif i2 >= 0:
+    elif i2 is not None:
         print(f"[ INSERTED ]")
         print(f"  + {final_rev[i2]}\n")
 ```
