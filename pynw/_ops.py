@@ -1,4 +1,4 @@
-"""Operation codes and index reconstruction for `needleman_wunsch_merge_split`."""
+"""Operation codes and index reconstruction for Needleman-Wunsch alignments."""
 
 from collections.abc import Iterable, Iterator
 from enum import IntEnum
@@ -70,9 +70,9 @@ def iter_alignment(
     ----------
     ops : ndarray of uint8
         EditOp sequence returned by ``needleman_wunsch``.
-    source_seq : sequence
+    source_sequence : sequence
         The source sequence passed to the aligner.
-    target_seq : sequence
+    target_sequence : sequence
         The target sequence passed to the aligner.
 
     Yields
