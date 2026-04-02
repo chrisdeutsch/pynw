@@ -37,6 +37,9 @@ from tests.helpers import (
     nw_score as _nw_score,
 )
 from tests.helpers import (
+    ops_to_gap_indices as _ops_to_gap_indices,
+)
+from tests.helpers import (
     recompute_score_from_indices as _recompute_score_from_indices,
 )
 
@@ -434,7 +437,7 @@ class TestLevenshteinWeighted:
         for s1, s2 in pairs:
             expected = -Levenshtein.distance(s1, s2, weights=weights)
             sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
-            score, _, _ = needleman_wunsch(
+            score, _ = needleman_wunsch(
                 sm,
                 gap_penalty_source=-weights[0],  # insertion into s1
                 gap_penalty_target=-weights[1],  # deletion from s1
@@ -455,7 +458,7 @@ class TestLevenshteinWeighted:
         for s1, s2 in pairs:
             expected = -Levenshtein.distance(s1, s2, weights=weights)
             sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
-            score, _, _ = needleman_wunsch(
+            score, _ = needleman_wunsch(
                 sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
             )
             assert score == expected
@@ -467,7 +470,7 @@ class TestLevenshteinWeighted:
         for s1, s2 in pairs:
             expected = -Levenshtein.distance(s1, s2, weights=weights)
             sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
-            score, _, _ = needleman_wunsch(
+            score, _ = needleman_wunsch(
                 sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
             )
             assert score == expected
@@ -539,9 +542,10 @@ class TestEditopsIndexComparison:
     def test_levenshtein_indices_score_matches_opcodes(self, s1: str, s2: str) -> None:
         sm = _char_score_matrix(s1, s2, match=0, mismatch=-1)
         gap = -1.0
-        nw_score, nw_ri, nw_ci = needleman_wunsch(
+        nw_score, ops = needleman_wunsch(
             sm, gap_penalty_source=gap, gap_penalty_target=gap
         )
+        nw_ri, nw_ci = _ops_to_gap_indices(ops)
 
         rf_ri, rf_ci = _opcodes_to_indices(Levenshtein.opcodes(s1, s2))
         rf_score = _recompute_score_from_indices(rf_ri, rf_ci, sm, gap, gap)
@@ -558,9 +562,10 @@ class TestEditopsIndexComparison:
     def test_indel_indices_score_matches_opcodes(self, s1: str, s2: str) -> None:
         sm = _char_score_matrix(s1, s2, match=0, mismatch=-2)
         gap = -1.0
-        nw_score, nw_ri, nw_ci = needleman_wunsch(
+        nw_score, ops = needleman_wunsch(
             sm, gap_penalty_source=gap, gap_penalty_target=gap
         )
+        nw_ri, nw_ci = _ops_to_gap_indices(ops)
 
         rf_ri, rf_ci = _opcodes_to_indices(Indel.opcodes(s1, s2))
         rf_score = _recompute_score_from_indices(rf_ri, rf_ci, sm, gap, gap)
@@ -581,9 +586,10 @@ class TestEditopsIndexComparison:
         gap_in_row = -float(weights[0])
         gap_in_col = -float(weights[1])
 
-        nw_score, nw_ri, nw_ci = needleman_wunsch(
+        nw_score, ops = needleman_wunsch(
             sm, gap_penalty_source=gap_in_row, gap_penalty_target=gap_in_col
         )
+        nw_ri, nw_ci = _ops_to_gap_indices(ops)
 
         # Score must match the known weighted Levenshtein distance.
         expected = -Levenshtein.distance(s1, s2, weights=weights)
@@ -628,9 +634,10 @@ class TestIndexStructuralProperties:
     ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
         """Return (score, row_idx, col_idx, score_matrix)."""
         sm = _char_score_matrix(s1, s2, match, mismatch)
-        score, ri, ci = needleman_wunsch(
+        score, ops = needleman_wunsch(
             sm, gap_penalty_source=gap, gap_penalty_target=gap
         )
+        ri, ci = _ops_to_gap_indices(ops)
         return score, ri, ci, sm
 
     # -- Levenshtein parameterisation -----------------------------------------
@@ -761,9 +768,10 @@ class TestIndexStructuralProperties:
             n = int(rng.integers(0, 15))
             m = int(rng.integers(0, 15))
             sm = rng.standard_normal((n, m))
-            score, ri, ci = needleman_wunsch(
+            score, ops = needleman_wunsch(
                 sm, gap_penalty_source=gap, gap_penalty_target=gap
             )
+            ri, ci = _ops_to_gap_indices(ops)
 
             # No double gaps
             assert not ((ri == -1) & (ci == -1)).any()

@@ -3,7 +3,8 @@
 import numpy as np
 import numpy.typing as npt
 
-from pynw import needleman_wunsch
+from pynw import indices_from_ops, needleman_wunsch
+from pynw._native import OP_DELETE, OP_INSERT
 
 
 def char_score_matrix(
@@ -30,8 +31,23 @@ def nw_score(
 ) -> float:
     """Return the NW optimal alignment score for two strings."""
     sm = char_score_matrix(s1, s2, match, mismatch)
-    score, _, _ = needleman_wunsch(sm, gap_penalty_source=gap, gap_penalty_target=gap)
+    score, _ = needleman_wunsch(sm, gap_penalty_source=gap, gap_penalty_target=gap)
     return score
+
+
+def ops_to_gap_indices(
+    ops: npt.NDArray[np.uint8],
+) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]:
+    """Convert an ops array to (source_idx, target_idx) with -1 for gaps.
+
+    INSERT ops produce -1 in source_idx; DELETE ops produce -1 in target_idx.
+    """
+    source_idx, target_idx = indices_from_ops(ops)
+    source_idx = source_idx.copy()
+    target_idx = target_idx.copy()
+    source_idx[ops == OP_INSERT] = -1
+    target_idx[ops == OP_DELETE] = -1
+    return source_idx, target_idx
 
 
 def recompute_score_from_indices(

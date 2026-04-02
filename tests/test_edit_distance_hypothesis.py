@@ -28,6 +28,9 @@ from tests.helpers import (
     nw_score as _nw_score,
 )
 from tests.helpers import (
+    ops_to_gap_indices as _ops_to_gap_indices,
+)
+from tests.helpers import (
     recompute_score_from_indices as _recompute_score_from_indices,
 )
 
@@ -232,7 +235,7 @@ class TestWeightedLevenshteinProperty:
         weights = (2, 1, 1)  # (insertion, deletion, substitution)
         expected = -Levenshtein.distance(s1, s2, weights=weights)
         sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
-        score, _, _ = needleman_wunsch(
+        score, _ = needleman_wunsch(
             sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
         )
         assert score == expected
@@ -242,7 +245,7 @@ class TestWeightedLevenshteinProperty:
         weights = (1, 3, 1)
         expected = -Levenshtein.distance(s1, s2, weights=weights)
         sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
-        score, _, _ = needleman_wunsch(
+        score, _ = needleman_wunsch(
             sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
         )
         assert score == expected
@@ -252,7 +255,7 @@ class TestWeightedLevenshteinProperty:
         weights = (1, 1, 2)
         expected = -Levenshtein.distance(s1, s2, weights=weights)
         sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
-        score, _, _ = needleman_wunsch(
+        score, _ = needleman_wunsch(
             sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
         )
         assert score == expected
@@ -279,9 +282,8 @@ class TestIndexStructuralPropertiesProperty:
         All structural invariants + score recomputation + optimality (Levenshtein).
         """
         sm = _char_score_matrix(s1, s2, 0, -1)
-        score, src_idx, tgt_idx = needleman_wunsch(
-            sm, gap_penalty_source=-1, gap_penalty_target=-1
-        )
+        score, ops = needleman_wunsch(sm, gap_penalty_source=-1, gap_penalty_target=-1)
+        src_idx, tgt_idx = _ops_to_gap_indices(ops)
 
         _assert_structural_invariants(src_idx, tgt_idx, len(s1), len(s2))
         assert _recompute_score_from_indices(src_idx, tgt_idx, sm, -1, -1) == score
@@ -291,9 +293,8 @@ class TestIndexStructuralPropertiesProperty:
     def test_indel_structural(self, s1: str, s2: str) -> None:
         """All structural invariants + score recomputation + optimality (Indel)."""
         sm = _char_score_matrix(s1, s2, 0, -2)
-        score, src_idx, tgt_idx = needleman_wunsch(
-            sm, gap_penalty_source=-1, gap_penalty_target=-1
-        )
+        score, ops = needleman_wunsch(sm, gap_penalty_source=-1, gap_penalty_target=-1)
+        src_idx, tgt_idx = _ops_to_gap_indices(ops)
 
         _assert_structural_invariants(src_idx, tgt_idx, len(s1), len(s2))
         assert _recompute_score_from_indices(src_idx, tgt_idx, sm, -1, -1) == score
@@ -303,9 +304,8 @@ class TestIndexStructuralPropertiesProperty:
     def test_lcs_structural(self, s1: str, s2: str) -> None:
         """All structural invariants + score recomputation + optimality (LCS)."""
         sm = _char_score_matrix(s1, s2, 1, 0)
-        score, src_idx, tgt_idx = needleman_wunsch(
-            sm, gap_penalty_source=0, gap_penalty_target=0
-        )
+        score, ops = needleman_wunsch(sm, gap_penalty_source=0, gap_penalty_target=0)
+        src_idx, tgt_idx = _ops_to_gap_indices(ops)
 
         _assert_structural_invariants(src_idx, tgt_idx, len(s1), len(s2))
         assert _recompute_score_from_indices(src_idx, tgt_idx, sm, 0, 0) == score
@@ -318,9 +318,10 @@ class TestIndexStructuralPropertiesProperty:
         n = len(s1)
         gap = -(n + 1) if n > 0 else -1.0
         sm = _char_score_matrix(s1, s2, 0, -1)
-        score, src_idx, tgt_idx = needleman_wunsch(
+        score, ops = needleman_wunsch(
             sm, gap_penalty_source=gap, gap_penalty_target=gap
         )
+        src_idx, tgt_idx = _ops_to_gap_indices(ops)
 
         # No gaps at all
         assert not (src_idx == -1).any()
@@ -342,9 +343,10 @@ class TestIndexStructuralPropertiesProperty:
         sm = _char_score_matrix(s1, s2, 0, -weights[2])
         gap1 = -float(weights[0])
         gap2 = -float(weights[1])
-        score, src_idx, tgt_idx = needleman_wunsch(
+        score, ops = needleman_wunsch(
             sm, gap_penalty_source=gap1, gap_penalty_target=gap2
         )
+        src_idx, tgt_idx = _ops_to_gap_indices(ops)
 
         _assert_structural_invariants(src_idx, tgt_idx, len(s1), len(s2))
         assert _recompute_score_from_indices(src_idx, tgt_idx, sm, gap1, gap2) == score
@@ -354,9 +356,8 @@ class TestIndexStructuralPropertiesProperty:
     def test_levenshtein_structural_unicode(self, s1: str, s2: str) -> None:
         """Structural invariants for Unicode strings (Levenshtein)."""
         sm = _char_score_matrix(s1, s2, 0, -1)
-        score, src_idx, tgt_idx = needleman_wunsch(
-            sm, gap_penalty_source=-1, gap_penalty_target=-1
-        )
+        score, ops = needleman_wunsch(sm, gap_penalty_source=-1, gap_penalty_target=-1)
+        src_idx, tgt_idx = _ops_to_gap_indices(ops)
 
         _assert_structural_invariants(src_idx, tgt_idx, len(s1), len(s2))
         assert _recompute_score_from_indices(src_idx, tgt_idx, sm, -1, -1) == score
@@ -389,9 +390,10 @@ class TestIndexStructuralPropertiesProperty:
             else np.empty((n, m))
         )
         gap = -1.0
-        score, src_idx, tgt_idx = needleman_wunsch(
+        score, ops = needleman_wunsch(
             sm, gap_penalty_source=gap, gap_penalty_target=gap
         )
+        src_idx, tgt_idx = _ops_to_gap_indices(ops)
 
         _assert_structural_invariants(src_idx, tgt_idx, n, m)
         assert _recompute_score_from_indices(
