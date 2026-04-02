@@ -96,13 +96,13 @@ class TestInputValidation:
 
     def test_check_finite_rejects_nan_gap_penalty(self) -> None:
         sm = np.array([[1.0]])
-        with pytest.raises(ValueError, match=r"gap_penalty_row"):
+        with pytest.raises(ValueError, match=r"gap_penalty_source"):
             needleman_wunsch(sm, gap_penalty=float("nan"), check_finite=True)
 
-    def test_check_finite_rejects_inf_gap_penalty_col(self) -> None:
+    def test_check_finite_rejects_inf_gap_penalty_target(self) -> None:
         sm = np.array([[1.0]])
-        with pytest.raises(ValueError, match=r"gap_penalty_col"):
-            needleman_wunsch(sm, gap_penalty_col=float("inf"), check_finite=True)
+        with pytest.raises(ValueError, match=r"gap_penalty_target"):
+            needleman_wunsch(sm, gap_penalty_target=float("inf"), check_finite=True)
 
     def test_check_finite_false_allows_nan(self) -> None:
         """Default check_finite=False does not raise on non-finite input."""
@@ -132,7 +132,7 @@ class TestEmptyAndDegenerate:
 
     def test_one_empty_row_dimension(self) -> None:
         score, ri, ci = needleman_wunsch(
-            np.empty((0, 3), dtype=np.float64), gap_penalty_row=-2
+            np.empty((0, 3), dtype=np.float64), gap_penalty_source=-2
         )
         assert score == -6.0
         np.testing.assert_array_equal(ri, [-1, -1, -1])
@@ -140,7 +140,7 @@ class TestEmptyAndDegenerate:
 
     def test_one_empty_col_dimension(self) -> None:
         score, ri, ci = needleman_wunsch(
-            np.empty((2, 0), dtype=np.float64), gap_penalty_col=-3
+            np.empty((2, 0), dtype=np.float64), gap_penalty_target=-3
         )
         assert score == -6.0
         np.testing.assert_array_equal(ri, [0, 1])
@@ -241,22 +241,24 @@ class TestGapPenalties:
 
     def test_asymmetric_gap_penalties(self) -> None:
         sm = np.array([[-1.0, 2.0], [2.0, -1.0]], dtype=np.float64)
-        score, ri, ci = needleman_wunsch(sm, gap_penalty_row=-0.5, gap_penalty_col=-3.0)
+        score, ri, ci = needleman_wunsch(
+            sm, gap_penalty_source=-0.5, gap_penalty_target=-3.0
+        )
         assert score == -1.5
         np.testing.assert_array_equal(ri, [-1, 0, 1])
         np.testing.assert_array_equal(ci, [0, 1, -1])
 
-    def test_gap_penalty_row_overrides_default(self) -> None:
-        """gap_penalty_row takes precedence over gap_penalty for row gaps."""
+    def test_gap_penalty_source_overrides_default(self) -> None:
+        """gap_penalty_source takes precedence over gap_penalty for row gaps."""
         sm = np.empty((0, 2), dtype=np.float64)
         # gap_penalty=-100 should be ignored for row gaps
-        score, _, _ = needleman_wunsch(sm, gap_penalty=-100.0, gap_penalty_row=-1.0)
+        score, _, _ = needleman_wunsch(sm, gap_penalty=-100.0, gap_penalty_source=-1.0)
         assert score == -2.0
 
-    def test_gap_penalty_col_overrides_default(self) -> None:
-        """gap_penalty_col takes precedence over gap_penalty for col gaps."""
+    def test_gap_penalty_target_overrides_default(self) -> None:
+        """gap_penalty_target takes precedence over gap_penalty for col gaps."""
         sm = np.empty((2, 0), dtype=np.float64)
-        score, _, _ = needleman_wunsch(sm, gap_penalty=-100.0, gap_penalty_col=-1.0)
+        score, _, _ = needleman_wunsch(sm, gap_penalty=-100.0, gap_penalty_target=-1.0)
         assert score == -2.0
 
 
@@ -392,7 +394,9 @@ class TestStructuralInvariants:
     def test_invariants_with_asymmetric_gaps(self) -> None:
         rng = np.random.default_rng(99)
         sm = rng.standard_normal((4, 6))
-        score, ri, ci = needleman_wunsch(sm, gap_penalty_row=-0.5, gap_penalty_col=-2.0)
+        score, ri, ci = needleman_wunsch(
+            sm, gap_penalty_source=-0.5, gap_penalty_target=-2.0
+        )
         assert_structural_invariants(ri, ci, 4, 6)
         assert recompute_score_from_indices(ri, ci, sm, -0.5, -2.0) == pytest.approx(
             score

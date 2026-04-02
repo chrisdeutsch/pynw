@@ -12,7 +12,7 @@ from pynw import needleman_wunsch
 from rapidfuzz.process import cdist
 from rapidfuzz.fuzz import ratio
 
-row_seq = np.array([
+source_seq = np.array([
     "Episode I - The Phantom Menace",
     "Episode II - Attack of the Clones",
     "Episode III - Revenge of the Sith",
@@ -21,20 +21,20 @@ row_seq = np.array([
     "Episode VI - Return of the Jedi",
 ])
 
-col_seq = np.array([
+target_seq = np.array([
     "Attack of the Clones",
     "A New Hope",
     "The Empire Strikes Back",
     "Return of the Jedi",
 ])
 
-score = cdist(row_seq, col_seq, scorer=ratio) / 100
-_, row_idx, col_idx = needleman_wunsch(score)
-row_items = np.where(row_idx >= 0, row_seq[row_idx], "GAP")
-col_items = np.where(col_idx >= 0, col_seq[col_idx], "GAP")
+score = cdist(source_seq, target_seq, scorer=ratio) / 100
+_, source_idx, target_idx = needleman_wunsch(score)
+source_items = np.where(source_idx >= 0, source_seq[source_idx], "GAP")
+target_items = np.where(target_idx >= 0, target_seq[target_idx], "GAP")
 
-for row_item, col_item in zip(row_items, col_items):
-    print(f"{row_item:40} -> {col_item}")
+for source_item, target_item in zip(source_items, target_items):
+    print(f"{source_item:40} -> {target_item}")
 ```
 
 Expected output:
@@ -111,11 +111,11 @@ similarity_matrix = cosine_sim - threshold
 # 4. Run alignment
 # We set gap penalties to 0.0. The algorithm will naturally align sentences
 # that score > 0 (similarity > threshold), and insert gaps otherwise.
-score, row_idx, col_idx = needleman_wunsch(similarity_matrix, gap_penalty=0.0)
+score, source_idx, target_idx = needleman_wunsch(similarity_matrix, gap_penalty=0.0)
 
 # 5. Print the Semantic Diff
 print("--- Semantic Document Diff ---\n")
-for i1, i2 in zip(row_idx, col_idx):
+for i1, i2 in zip(source_idx, target_idx):
     if i1 >= 0 and i2 >= 0:
         print(f"[ MATCH ] (sim: {cosine_sim[i1, i2]:.2f})")
         print(f"  - {draft[i1]}")
@@ -133,25 +133,25 @@ Expected output:
 ```text
 --- Semantic Document Diff ---
 
-[ MATCH ] (sim: 0.86)
+[ MATCH ]
   - The company was founded in 2012 by two friends.
   + Two university buddies established the corp in 2012.
 
-[ MATCH ] (sim: 0.81)
+[ MATCH ]
   - They started working in a small garage.
   + Their origins trace back to a tiny residential garage.
 
 [ DELETED ]
   - Initially, they struggled to find investors.
 
-[ MATCH ] (sim: 0.70)
+[ MATCH ]
   - However, their first product was a big hit.
   + After several months, they launched a successful app.
 
 [ INSERTED ]
   + They recently expanded to the European market.
 
-[ MATCH ] (sim: 0.91)
+[ MATCH ]
   - Today, they employ over 500 people.
   + Currently, the workforce consists of 500+ employees.
 ```

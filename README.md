@@ -47,17 +47,17 @@ similarity_matrix = np.where(
     np.array(seq1)[:, None] == np.array(seq2)[None, :], match, mismatch
 )
 
-score, row_idx, col_idx = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
+score, source_idx, target_idx = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
 
-aligned1 = "".join(seq1[i] if i >= 0 else "-" for i in row_idx)
-aligned2 = "".join(seq2[i] if i >= 0 else "-" for i in col_idx)
+aligned1 = "".join(seq1[i] if i >= 0 else "-" for i in source_idx)
+aligned2 = "".join(seq2[i] if i >= 0 else "-" for i in target_idx)
 print(f"Score: {score}\n{aligned1}\n{aligned2}")
 # Score: 2.0
 # G-ATTACA
 # GCA-TGCA
 ```
 
-`row_idx` and `col_idx` map each alignment position to an index in the
+`source_idx` and `target_idx` map each alignment position to an index in the
 original sequence, with `-1` indicating a gap.
 
 ## Details

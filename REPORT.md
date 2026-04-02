@@ -61,10 +61,10 @@ Python `ValueError` with a message that states the expected shape.
 `pynw/_ops.py` `indices_from_ops` returns one index per op, but MERGE and
 SPLIT ops consume two source or target elements respectively:
 
-- **MERGE** at op `k`: `row_idx[k]` is the index of the _first_ source element;
-  `row_idx[k] + 1` is the second. The second is implicit and not surfaced.
-- **SPLIT** at op `k`: `col_idx[k]` is the index of the _first_ target element;
-  `col_idx[k] + 1` is the second.
+- **MERGE** at op `k`: `source_idx[k]` is the index of the _first_ source element;
+  `source_idx[k] + 1` is the second. The second is implicit and not surfaced.
+- **SPLIT** at op `k`: `target_idx[k]` is the index of the _first_ target element;
+  `target_idx[k] + 1` is the second.
 
 The function docstring says only "Reconstruct row and column indices from an
 ops array", giving no indication of this convention. Callers who do not read

@@ -8,3 +8,5 @@ __pycache__/
 .hypothesis/
 .benchmarks/
 site/
+.claude/
+

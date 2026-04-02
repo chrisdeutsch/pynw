@@ -28,6 +28,7 @@ pre-commit:
 
     - name: markdown
       glob: "*.md"
+      exclude: "CLAUDE.md"
       group:
         piped: true
         jobs:

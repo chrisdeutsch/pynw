@@ -4,12 +4,12 @@
 
 pynw currently exposes two functions with incompatible interfaces:
 
-|                    | `needleman_wunsch`                    | `needleman_wunsch_merge_split`      |
-| ------------------ | ------------------------------------- | ----------------------------------- |
-| **Input**          | 1 score matrix + 2 gap penalties      | 3 score matrices + 2 gap penalties  |
-| **Returns**        | `(score, row_idx, col_idx)`           | `(score, ops)`                      |
-| **Gap names**      | `gap_penalty_row` / `gap_penalty_col` | `insert_penalty` / `delete_penalty` |
-| **Gap convention** | `-1` sentinel in index arrays         | gap info lives in ops array         |
+|                    | `needleman_wunsch`                          | `needleman_wunsch_merge_split`      |
+| ------------------ | ------------------------------------------- | ----------------------------------- |
+| **Input**          | 1 score matrix + 2 gap penalties            | 3 score matrices + 2 gap penalties  |
+| **Returns**        | `(score, source_idx, target_idx)`           | `(score, ops)`                      |
+| **Gap names**      | `gap_penalty_source` / `gap_penalty_target` | `insert_penalty` / `delete_penalty` |
+| **Gap convention** | `-1` sentinel in index arrays               | gap info lives in ops array         |
 
 This creates two problems: users face different mental models depending on
 which function they call, and adding new operations (e.g. 2-to-2 swap)
@@ -19,10 +19,10 @@ requires yet another function or a growing parameter list.
 
 Every edit operation in Needleman-Wunsch is fully described by three values:
 
-1. **Row stride** -- how many row elements it consumes (0, 1, 2, ...)
-2. **Column stride** -- how many column elements it consumes (0, 1, 2, ...)
+1. **Source stride** -- how many source elements it consumes (0, 1, 2, ...)
+2. **Target stride** -- how many target elements it consumes (0, 1, 2, ...)
 3. **Score source** -- either a scalar (constant penalty) or a position-dependent
-   matrix of shape `(n - row_stride + 1, m - col_stride + 1)`
+   matrix of shape `(n - source_stride + 1, m - target_stride + 1)`
 
 All current and future operations fit this model:
 
@@ -50,13 +50,13 @@ def needleman_wunsch(
     """Align two ordered sequences using caller-defined edit operations.
 
     Each positional argument defines one edit operation as a
-    ``(row_stride, col_stride, scores)`` tuple:
+    ``(source_stride, target_stride, scores)`` tuple:
 
-    - **row_stride** / **col_stride**: number of row / column elements
+    - **source_stride** / **target_stride**: number of source / target elements
       consumed by this operation (non-negative integers).
     - **scores**: either a scalar (constant cost, e.g. a gap penalty) or
       a 2-D array of shape
-      ``(n - row_stride + 1, m - col_stride + 1)``
+      ``(n - source_stride + 1, m - target_stride + 1)``
       giving the position-dependent score. Sequence lengths *n* and *m*
       are inferred from the first matrix-valued operation.
 
@@ -67,7 +67,7 @@ def needleman_wunsch(
     Parameters
     ----------
     *operations : tuple[int, int, ArrayLike | float]
-        Variable number of ``(row_stride, col_stride, scores)`` tuples.
+        Variable number of ``(source_stride, target_stride, scores)`` tuples.
         At least one operation must have both strides > 0 so that *n*
         and *m* can be inferred.
     check_finite : bool, default False
@@ -112,10 +112,10 @@ def needleman_wunsch(
     ... )
     >>> score, ops = needleman_wunsch(
     ...     (1, 1, sm),    # op 0: align
-    ...     (0, 1, -1.0),  # op 1: insert (gap in row)
-    ...     (1, 0, -1.0),  # op 2: delete (gap in col)
+    ...     (0, 1, -1.0),  # op 1: insert (gap in source)
+    ...     (1, 0, -1.0),  # op 2: delete (gap in target)
     ... )
-    >>> row_idx, col_idx = indices_from_ops(ops, [1, 0, 1], [1, 1, 0])
+    >>> source_idx, target_idx = indices_from_ops(ops, [1, 0, 1], [1, 1, 0])
     """
 ```
 
@@ -126,8 +126,8 @@ Takes caller-provided stride tables instead of a hardcoded enum:
 ```python
 def indices_from_ops(
     ops: npt.NDArray[np.uint8],
-    row_strides: Sequence[int],
-    col_strides: Sequence[int],
+    source_strides: Sequence[int],
+    target_strides: Sequence[int],
 ) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]:
     """Reconstruct row/column start indices from an ops array.
 
@@ -135,35 +135,99 @@ def indices_from_ops(
     ----------
     ops : ndarray of uint8
         Operation codes returned by ``needleman_wunsch``.
-    row_strides : sequence of int
-        Row stride for each op code (same order as operations passed
+    source_strides : sequence of int
+        Source stride for each op code (same order as operations passed
         to ``needleman_wunsch``).
-    col_strides : sequence of int
-        Column stride for each op code.
+    target_strides : sequence of int
+        Target stride for each op code.
 
     Returns
     -------
-    row_idx : ndarray of intp
-        Starting row index for each operation.
-    col_idx : ndarray of intp
-        Starting column index for each operation.
+    source_idx : ndarray of intp
+        Starting source index for each operation.
+    target_idx : ndarray of intp
+        Starting target index for each operation.
 
     Notes
     -----
     For multi-element operations (stride > 1), the returned index is the
     *first* element consumed.  The subsequent elements are implicit:
-    ``row_idx[k], row_idx[k]+1, ..., row_idx[k]+row_stride-1``.
+    ``source_idx[k], source_idx[k]+1, ..., source_idx[k]+source_stride-1``.
 
     For zero-stride operations (gaps), the index is the position where
     the gap occurs (i.e. the index of the *next* element that will be
     consumed on that axis).
     """
-    rs = np.array(row_strides, dtype=np.intp)
-    cs = np.array(col_strides, dtype=np.intp)
-    row_idx = np.cumsum(rs[ops]) - rs[ops]
-    col_idx = np.cumsum(cs[ops]) - cs[ops]
-    return row_idx, col_idx
+    rs = np.array(source_strides, dtype=np.intp)
+    cs = np.array(target_strides, dtype=np.intp)
+    source_idx = np.cumsum(rs[ops]) - rs[ops]
+    target_idx = np.cumsum(cs[ops]) - cs[ops]
+    return source_idx, target_idx
 ```
+
+### `iter_alignment`
+
+The current `iter_alignment` signature uses `T | None` to signal gaps:
+
+```python
+Iterator[tuple[Op, T | None, S | None]]
+```
+
+This cannot represent multi-element ops: SPLIT consumes 1 source element and 2
+target elements; MERGE consumes 2 source elements and 1 target element; a future
+SWAP consumes 2 of each. The `None` sentinel must be replaced by tuples on
+both sides:
+
+```python
+Iterator[tuple[int, tuple[T, ...], tuple[S, ...]]]
+```
+
+| Op     | `row_items`          | `col_items`          |
+| ------ | -------------------- | -------------------- |
+| align  | `(row[i],)`          | `(col[j],)`          |
+| insert | `()`                 | `(col[j],)`          |
+| delete | `(row[i],)`          | `()`                 |
+| split  | `(row[i],)`          | `(col[j], col[j+1])` |
+| merge  | `(row[i], row[i+1])` | `(col[j],)`          |
+| swap   | `(row[i], row[i+1])` | `(col[j+1], col[j])` |
+
+Empty tuple replaces `None`; the arity of each tuple equals the stride of that
+side. The op code is now a plain `int` (caller-defined index) rather than the
+`Op` enum which is being removed.
+
+`zip(row_items, col_items)` on a SWAP step yields the _crossed_ pairs
+`(row[i], col[j+1])` and `(row[i+1], col[j])` — the pairs that actually
+contributed to the score — because `col_items` is stored in reversed order.
+
+Python's `match`/`case` keeps consumption ergonomic despite the extra
+unpacking:
+
+```python
+for op, rs, cs in iter_alignment(ops, source_strides, target_strides, seq1, seq2):
+    match op:
+        case 0: aligned_row.append(rs[0]); aligned_col.append(cs[0])  # align
+        case 1: aligned_row.append("-");   aligned_col.append(cs[0])  # insert
+        case 2: aligned_row.append(rs[0]); aligned_col.append("-")    # delete
+        case 3: aligned_row.extend([rs[0], rs[0]]); aligned_col.extend(cs)  # split
+        case 4: aligned_row.extend(rs); aligned_col.extend([cs[0], cs[0]])  # merge
+```
+
+The signature must accept the stride tables so it can reconstruct positions for
+arbitrary caller-defined operations — mirroring `indices_from_ops`:
+
+```python
+def iter_alignment(
+    ops: npt.NDArray[np.uint8],
+    source_strides: Sequence[int],
+    target_strides: Sequence[int],
+    source_seq: Sequence[T],
+    target_seq: Sequence[S],
+) -> Iterator[tuple[int, tuple[T, ...], tuple[S, ...]]]:
+```
+
+This is a **breaking change** from the current implementation (which uses
+`T | None` and takes no stride tables). The change should land as part of
+Phase 3 alongside the rest of the Python-layer rewrite.
 
 ### Convenience constructors (Python-side, optional)
 
@@ -258,8 +322,8 @@ score, ops = needleman_wunsch(
 ```rust
 /// A single edit operation definition.
 struct Operation {
-    row_stride: usize,
-    col_stride: usize,
+    source_stride: usize,
+    target_stride: usize,
     /// None = scalar (stored in `scalar_score`), Some = matrix view.
     scores: Option<ArrayView2<'_, f64>>,
     scalar_score: f64,
@@ -291,8 +355,8 @@ fn fill_general(
             let mut best_op: u8 = 0;
 
             for (op_idx, op) in ops.iter().enumerate() {
-                let rs = op.row_stride;
-                let cs = op.col_stride;
+                let rs = op.source_stride;
+                let cs = op.target_stride;
 
                 // Can this operation land at (i, j)?
                 if i < rs || j < cs { continue; }
@@ -349,8 +413,8 @@ fn traceback_general(
         let op_idx = tb[[i, j]];
         result.push(op_idx);
         let op = &ops[op_idx as usize];
-        i -= op.row_stride;
-        j -= op.col_stride;
+        i -= op.source_stride;
+        j -= op.target_stride;
     }
 
     result.reverse();
@@ -371,7 +435,7 @@ the dynamic operation list.
 // In lib.rs, after parsing operations:
 let ops_signature: Vec<(usize, usize, bool)> = operations
     .iter()
-    .map(|op| (op.row_stride, op.col_stride, op.scores.is_some()))
+    .map(|op| (op.source_stride, op.target_stride, op.scores.is_some()))
     .collect();
 
 match ops_signature.as_slice() {
@@ -424,8 +488,8 @@ operation:
 fn infer_dimensions(operations: &[Operation]) -> Result<(usize, usize), String> {
     for op in operations {
         if let Some(ref matrix) = op.scores {
-            let n = matrix.nrows() + op.row_stride - 1;
-            let m = matrix.ncols() + op.col_stride - 1;
+            let n = matrix.nrows() + op.source_stride - 1;
+            let m = matrix.ncols() + op.target_stride - 1;
             return Ok((n, m));
         }
     }
@@ -439,8 +503,8 @@ All subsequent matrix operations are validated against the inferred `(n, m)`:
 fn validate_shapes(operations: &[Operation], n: usize, m: usize) -> Result<(), String> {
     for (idx, op) in operations.iter().enumerate() {
         if let Some(ref matrix) = op.scores {
-            let expected_rows = n + 1 - op.row_stride;
-            let expected_cols = m + 1 - op.col_stride;
+            let expected_rows = n + 1 - op.source_stride;
+            let expected_cols = m + 1 - op.target_stride;
             if matrix.nrows() != expected_rows || matrix.ncols() != expected_cols {
                 return Err(format!(
                     "Operation {}: expected shape ({}, {}), got ({}, {})",
@@ -473,20 +537,20 @@ fn needleman_wunsch<'py>(
         return Err(PyValueError::new_err("At most 255 operations supported"));
     }
 
-    // Parse each (row_stride, col_stride, scores_or_scalar) tuple
+    // Parse each (source_stride, target_stride, scores_or_scalar) tuple
     let mut parsed_ops = Vec::with_capacity(operations.len());
     let mut matrix_views = Vec::new();  // keep PyReadonlyArray2 alive
 
     for (idx, tup) in operations.iter().enumerate() {
-        let row_stride: usize = tup.get_item(0)?.extract()?;
-        let col_stride: usize = tup.get_item(1)?.extract()?;
+        let source_stride: usize = tup.get_item(0)?.extract()?;
+        let target_stride: usize = tup.get_item(1)?.extract()?;
         let scores_obj = tup.get_item(2)?;
 
         if let Ok(scalar) = scores_obj.extract::<f64>() {
             // Scalar operation
             parsed_ops.push(Operation {
-                row_stride,
-                col_stride,
+                source_stride,
+                target_stride,
                 scores: None,
                 scalar_score: scalar,
             });
@@ -523,11 +587,11 @@ fn needleman_wunsch<'py>(
 
 ### Python (`pynw/`)
 
-| File               | Action      | Description                                                                                         |
-| ------------------ | ----------- | --------------------------------------------------------------------------------------------------- |
-| `pynw/__init__.py` | **Modify**  | Update `__all__`, add `align_setup` / `align_merge_split_setup`, remove `Op` re-export              |
-| `pynw/_native.pyi` | **Rewrite** | New `needleman_wunsch` stub, remove `needleman_wunsch_merge_split` and `OP_*` constants             |
-| `pynw/_ops.py`     | **Rewrite** | New `indices_from_ops(ops, row_strides, col_strides)`, remove `Op` enum and hardcoded stride tables |
+| File               | Action      | Description                                                                                               |
+| ------------------ | ----------- | --------------------------------------------------------------------------------------------------------- |
+| `pynw/__init__.py` | **Modify**  | Update `__all__`, add `align_setup` / `align_merge_split_setup`, remove `Op` re-export                    |
+| `pynw/_native.pyi` | **Rewrite** | New `needleman_wunsch` stub, remove `needleman_wunsch_merge_split` and `OP_*` constants                   |
+| `pynw/_ops.py`     | **Rewrite** | New `indices_from_ops(ops, source_strides, target_strides)`, remove `Op` enum and hardcoded stride tables |
 
 ### Tests (`tests/`)
 
@@ -570,7 +634,7 @@ fn needleman_wunsch<'py>(
 
 ### Phase 3: Python layer
 
-1. Rewrite `pynw/_ops.py`: new `indices_from_ops(ops, row_strides, col_strides)`.
+1. Rewrite `pynw/_ops.py`: new `indices_from_ops(ops, source_strides, target_strides)`.
 2. Rewrite `pynw/_native.pyi`: new stub for `needleman_wunsch`.
 3. Update `pynw/__init__.py`: add convenience constructors, update `__all__`.
 
@@ -595,8 +659,8 @@ fn needleman_wunsch<'py>(
 ```python
 from pynw import needleman_wunsch
 
-score, row_idx, col_idx = needleman_wunsch(sm, gap_penalty=-1.0)
-for i, j in zip(row_idx, col_idx):
+score, source_idx, target_idx = needleman_wunsch(sm, gap_penalty=-1.0)
+for i, j in zip(source_idx, target_idx):
     if i >= 0 and j >= 0:
         print(f"align {i} <-> {j}")
     elif i >= 0:
@@ -611,13 +675,13 @@ for i, j in zip(row_idx, col_idx):
 from pynw import needleman_wunsch, indices_from_ops, align_setup
 
 ALIGN, INSERT, DELETE = 0, 1, 2
-ROW_STRIDES = [1, 0, 1]
-COL_STRIDES = [1, 1, 0]
+SOURCE_STRIDES = [1, 0, 1]
+TARGET_STRIDES = [1, 1, 0]
 
 score, ops = needleman_wunsch(*align_setup(sm, gap_penalty=-1.0))
-row_idx, col_idx = indices_from_ops(ops, ROW_STRIDES, COL_STRIDES)
+source_idx, target_idx = indices_from_ops(ops, SOURCE_STRIDES, TARGET_STRIDES)
 
-for op, i, j in zip(ops, row_idx, col_idx):
+for op, i, j in zip(ops, source_idx, target_idx):
     if op == ALIGN:
         print(f"align {i} <-> {j}")
     elif op == DELETE:
@@ -634,7 +698,7 @@ from pynw import needleman_wunsch_merge_split, Op, indices_from_ops
 score, ops = needleman_wunsch_merge_split(
     align_scores, split_scores, merge_scores, gap_penalty=-0.5
 )
-row_idx, col_idx = indices_from_ops(ops)
+source_idx, target_idx = indices_from_ops(ops)
 ```
 
 ### After (merge/split)
@@ -646,9 +710,9 @@ score, ops = needleman_wunsch(*align_merge_split_setup(
     align_scores, split_scores, merge_scores, gap_penalty=-0.5
 ))
 # Op indices: 0=align, 1=insert, 2=delete, 3=split, 4=merge
-ROW_STRIDES = [1, 0, 1, 1, 2]
-COL_STRIDES = [1, 1, 0, 2, 1]
-row_idx, col_idx = indices_from_ops(ops, ROW_STRIDES, COL_STRIDES)
+SOURCE_STRIDES = [1, 0, 1, 1, 2]
+TARGET_STRIDES = [1, 1, 0, 2, 1]
+source_idx, target_idx = indices_from_ops(ops, SOURCE_STRIDES, TARGET_STRIDES)
 ```
 
 ### Future (2-to-2 swap, no API change)
@@ -660,9 +724,9 @@ score, ops = needleman_wunsch(
     (1, 0, -1.0),            # 2: delete
     (2, 2, swap_scores),     # 3: swap
 )
-ROW_STRIDES = [1, 0, 1, 2]
-COL_STRIDES = [1, 1, 0, 2]
-row_idx, col_idx = indices_from_ops(ops, ROW_STRIDES, COL_STRIDES)
+SOURCE_STRIDES = [1, 0, 1, 2]
+TARGET_STRIDES = [1, 1, 0, 2]
+source_idx, target_idx = indices_from_ops(ops, SOURCE_STRIDES, TARGET_STRIDES)
 ```
 
 ## Performance Considerations
@@ -732,4 +796,4 @@ be documented.
 
 4. **Should we support `(0, 0, ...)` operations?** A (0, 0) operation
    consumes nothing and would cause an infinite loop. Validate that every
-   operation has `row_stride + col_stride > 0`.
+   operation has `source_stride + target_stride > 0`.

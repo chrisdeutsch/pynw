@@ -406,11 +406,11 @@ class TestLevenshteinWeighted:
         """Insertion cost = 2, deletion cost = 1, replace cost = 1.
 
         In NW terms:
-        - gap_in_row = -2  (gap in the row sequence = insertion into s1 = deletion
-                            from s2 ... but from the edit-distance perspective,
-                            inserting a character into s1 to match s2 means the
-                            column sequence advances)
-        - gap_in_col = -1  (deletion from s1)
+        - gap_in_source = -2  (gap in the source sequence = insertion into s1 = deletion
+                              from s2 ... but from the edit-distance perspective,
+                              inserting a character into s1 to match s2 means the
+                              target sequence advances)
+        - gap_in_target = -1  (deletion from s1)
         - mismatch = -1  (replacement)
 
         Actually, the rapidfuzz weight convention:
@@ -419,9 +419,9 @@ class TestLevenshteinWeighted:
         - deletion = cost to delete a char from s1 (i.e., s1 has a char s2 doesn't)
 
         In NW terms:
-        - gap_in_row = cost when the column sequence advances without the row
+        - gap_in_source = cost when the target sequence advances without the source
           sequence = insertion cost (negated)
-        - gap_in_col = cost when the row sequence advances without the column
+        - gap_in_target = cost when the source sequence advances without the target
           sequence = deletion cost (negated)
         """
         pairs = [
@@ -436,8 +436,8 @@ class TestLevenshteinWeighted:
             sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
             score, _, _ = needleman_wunsch(
                 sm,
-                gap_penalty_row=-weights[0],  # insertion into s1
-                gap_penalty_col=-weights[1],  # deletion from s1
+                gap_penalty_source=-weights[0],  # insertion into s1
+                gap_penalty_target=-weights[1],  # deletion from s1
             )
             assert score == expected, (
                 f"Weighted Levenshtein mismatch for ({s1!r}, {s2!r}): "
@@ -456,7 +456,7 @@ class TestLevenshteinWeighted:
             expected = -Levenshtein.distance(s1, s2, weights=weights)
             sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
             score, _, _ = needleman_wunsch(
-                sm, gap_penalty_row=-weights[0], gap_penalty_col=-weights[1]
+                sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
             )
             assert score == expected
 
@@ -468,7 +468,7 @@ class TestLevenshteinWeighted:
             expected = -Levenshtein.distance(s1, s2, weights=weights)
             sm = _char_score_matrix(s1, s2, match=0, mismatch=-weights[2])
             score, _, _ = needleman_wunsch(
-                sm, gap_penalty_row=-weights[0], gap_penalty_col=-weights[1]
+                sm, gap_penalty_source=-weights[0], gap_penalty_target=-weights[1]
             )
             assert score == expected
 
@@ -540,7 +540,7 @@ class TestEditopsIndexComparison:
         sm = _char_score_matrix(s1, s2, match=0, mismatch=-1)
         gap = -1.0
         nw_score, nw_ri, nw_ci = needleman_wunsch(
-            sm, gap_penalty_row=gap, gap_penalty_col=gap
+            sm, gap_penalty_source=gap, gap_penalty_target=gap
         )
 
         rf_ri, rf_ci = _opcodes_to_indices(Levenshtein.opcodes(s1, s2))
@@ -559,7 +559,7 @@ class TestEditopsIndexComparison:
         sm = _char_score_matrix(s1, s2, match=0, mismatch=-2)
         gap = -1.0
         nw_score, nw_ri, nw_ci = needleman_wunsch(
-            sm, gap_penalty_row=gap, gap_penalty_col=gap
+            sm, gap_penalty_source=gap, gap_penalty_target=gap
         )
 
         rf_ri, rf_ci = _opcodes_to_indices(Indel.opcodes(s1, s2))
@@ -582,7 +582,7 @@ class TestEditopsIndexComparison:
         gap_in_col = -float(weights[1])
 
         nw_score, nw_ri, nw_ci = needleman_wunsch(
-            sm, gap_penalty_row=gap_in_row, gap_penalty_col=gap_in_col
+            sm, gap_penalty_source=gap_in_row, gap_penalty_target=gap_in_col
         )
 
         # Score must match the known weighted Levenshtein distance.
@@ -628,7 +628,9 @@ class TestIndexStructuralProperties:
     ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
         """Return (score, row_idx, col_idx, score_matrix)."""
         sm = _char_score_matrix(s1, s2, match, mismatch)
-        score, ri, ci = needleman_wunsch(sm, gap_penalty_row=gap, gap_penalty_col=gap)
+        score, ri, ci = needleman_wunsch(
+            sm, gap_penalty_source=gap, gap_penalty_target=gap
+        )
         return score, ri, ci, sm
 
     # -- Levenshtein parameterisation -----------------------------------------
@@ -760,7 +762,7 @@ class TestIndexStructuralProperties:
             m = int(rng.integers(0, 15))
             sm = rng.standard_normal((n, m))
             score, ri, ci = needleman_wunsch(
-                sm, gap_penalty_row=gap, gap_penalty_col=gap
+                sm, gap_penalty_source=gap, gap_penalty_target=gap
             )
 
             # No double gaps

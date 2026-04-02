@@ -20,7 +20,7 @@ The core DP and traceback are correct:
 - Traceback can never underflow — merge only appears in cells where `i >= 2`, split where `j >= 2`.
 - Boundary initialization (cumulative gap penalties along first row/column) is correct.
 - Empty inputs (`n=0` or `m=0`) produce the right score and ops.
-- Gap penalty mapping through PyO3 (`gap_penalty_row` → `penalty_insert`, `gap_penalty_col` → `penalty_delete`) is consistent with the original `nw.rs`.
+- Gap penalty mapping through PyO3 (`gap_penalty_source` → `penalty_insert`, `gap_penalty_target` → `penalty_delete`) is consistent with the original `nw.rs`.
 - `check_finite` validates all three score matrices.
 - `indices_from_ops` stride tables and cumsum logic are correct.
 
@@ -59,10 +59,10 @@ Either way, decide whether the canonical shape is `(n, m)` for all three (simple
 
 The Python stub (`_native.pyi:104-113`) has no docstring and the Rust doc comment is a single line. At minimum, document:
 
-- **Score matrix semantics**: `merge_scores[r, c]` is the score for merging row elements `r` and `r+1` into column element `c`; `split_scores[r, c]` is the score for splitting row element `r` into column elements `c` and `c+1`.
+- **Score matrix semantics**: `merge_scores[r, c]` is the score for merging source elements `r` and `r+1` into target element `c`; `split_scores[r, c]` is the score for splitting source element `r` into target elements `c` and `c+1`.
 - **Expected shapes** (see above).
 - **Return value**: the ops array contains `Op` codes (uint8); use `indices_from_ops` to get index arrays.
-- **`indices_from_ops` output semantics**: `row_idx[k]` / `col_idx[k]` is the _starting_ row/column element for operation `k`. This differs from the original NW's `-1`-for-gap convention — gap information is encoded in the ops array, not the indices.
+- **`indices_from_ops` output semantics**: `source_idx[k]` / `target_idx[k]` is the _starting_ source/target element for operation `k`. This differs from the original NW's `-1`-for-gap convention — gap information is encoded in the ops array, not the indices.
 
 ### 4. Document tie-breaking order (low priority)
 
@@ -74,7 +74,7 @@ This is consistent with the original NW's "Diagonal > Up > Left" for the three s
 
 ### 5. Align internal naming (low priority)
 
-The Rust function uses `penalty_insert` / `penalty_delete` while the Python API uses `gap_penalty_row` / `gap_penalty_col`. The mapping is correct but the naming gap could confuse maintainers. Consider renaming the Rust parameters to match, or adding a comment at the call site in `lib.rs:247-253` noting the correspondence.
+The Rust function uses `penalty_insert` / `penalty_delete` while the Python API uses `gap_penalty_source` / `gap_penalty_target`. The mapping is correct but the naming gap could confuse maintainers. Consider renaming the Rust parameters to match, or adding a comment at the call site in `lib.rs:247-253` noting the correspondence.
 
 ## Related Algorithms
 
