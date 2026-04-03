@@ -117,7 +117,6 @@ This repository uses [pixi](https://pixi.sh) for development:
 pixi install
 pixi run build            # build the Rust extension
 pixi run test             # run deterministic tests
-pixi run test-hypothesis  # run property-based tests
 pixi run lint             # run all pre-commit checks (ruff, cargo fmt, markdownlint, actionlint)
 pixi run check            # run all pre-push checks (cargo clippy, mypy)
 pixi run docs             # generate API docs in site/
