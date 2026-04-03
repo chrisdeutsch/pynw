@@ -8,7 +8,7 @@ without a close match are gapped, so you can see which entries were dropped.
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch, iter_alignment
+from pynw import needleman_wunsch, alignment_indices
 from rapidfuzz.process import cdist
 from rapidfuzz.fuzz import ratio
 
@@ -31,9 +31,12 @@ target_seq = np.array([
 score = cdist(source_seq, target_seq, scorer=ratio) / 100
 _, ops = needleman_wunsch(score)
 
-for _, source_item, target_item in iter_alignment(ops, source_seq, target_seq):
-    s = source_item if source_item is not None else "GAP"
-    t = target_item if target_item is not None else "GAP"
+src_idx, tgt_idx = alignment_indices(ops)
+
+aligned_src = np.where(src_idx.mask, "GAP", source_seq[src_idx.data])
+aligned_tgt = np.where(tgt_idx.mask, "GAP", target_seq[tgt_idx.data])
+
+for s, t in zip(aligned_src, aligned_tgt):
     print(f"{s:40} -> {t}")
 ```
 
@@ -68,7 +71,7 @@ uv pip install fastembed numpy
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch, iter_alignment
+from pynw import needleman_wunsch, alignment_indices
 from fastembed import TextEmbedding
 
 # Initialize the embedding model
@@ -114,16 +117,20 @@ similarity_matrix = cosine_sim - threshold
 _, ops = needleman_wunsch(similarity_matrix, gap_penalty=0.0)
 
 # 5. Print the Semantic Diff
+src_idx, tgt_idx = alignment_indices(ops)
+
 print("--- Semantic Document Diff ---\n")
-for _, i1, i2 in iter_alignment(ops, range(len(draft)), range(len(final_rev))):
-    if i1 is not None and i2 is not None:
+for i1, i2, src_gap, tgt_gap in zip(
+    src_idx.data, tgt_idx.data, src_idx.mask, tgt_idx.mask
+):
+    if not src_gap and not tgt_gap:
         print(f"[ MATCH ] (sim: {cosine_sim[i1, i2]:.2f})")
         print(f"  - {draft[i1]}")
         print(f"  + {final_rev[i2]}\n")
-    elif i1 is not None:
+    elif not src_gap:
         print(f"[ DELETED ]")
         print(f"  - {draft[i1]}\n")
-    elif i2 is not None:
+    else:
         print(f"[ INSERTED ]")
         print(f"  + {final_rev[i2]}\n")
 ```

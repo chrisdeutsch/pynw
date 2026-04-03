@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from pynw import indices_from_ops, needleman_wunsch
+from pynw import alignment_indices, needleman_wunsch
 from pynw._ops import EditOp
 
 scipy_optimize = pytest.importorskip("scipy.optimize")
@@ -50,12 +50,12 @@ def test_benchmark_linear_sum_assignment(benchmark, size: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# indices_from_ops: stride-table vs direct
+# alignment_indices: stride-table vs direct
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("length", OPS_LENGTHS, ids=lambda n: f"n={n}")
-def test_benchmark_indices_from_ops(benchmark, length: int) -> None:
+def test_benchmark_alignment_indices(benchmark, length: int) -> None:
     ops = _ops_array(length)
-    benchmark.group = f"indices_from_ops n={length}"
-    benchmark(indices_from_ops, ops)
+    benchmark.group = f"alignment_indices n={length}"
+    benchmark(alignment_indices, ops)

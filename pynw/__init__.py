@@ -7,7 +7,7 @@
 from importlib.metadata import version
 
 from pynw._native import needleman_wunsch, needleman_wunsch_merge_split
-from pynw._ops import EditOp, indices_from_ops, iter_alignment
+from pynw._ops import EditOp, alignment_indices
 
 __docformat__ = "numpy"
 __version__ = version("pynw")
@@ -16,6 +16,5 @@ __all__ = [
     "needleman_wunsch",
     "needleman_wunsch_merge_split",
     "EditOp",
-    "indices_from_ops",
-    "iter_alignment",
+    "alignment_indices",
 ]

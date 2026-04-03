@@ -61,7 +61,7 @@ def needleman_wunsch(
       are inferred from the first matrix-valued operation.
 
     The position of each operation in the argument list becomes its op
-    code in the returned ``ops`` array.  Use ``indices_from_ops`` to
+    code in the returned ``ops`` array.  Use ``alignment_indices`` to
     convert the op sequence into row/column index arrays.
 
     Parameters
@@ -105,7 +105,7 @@ def needleman_wunsch(
     Standard alignment (match/mismatch + gaps):
 
     >>> import numpy as np
-    >>> from pynw import needleman_wunsch, indices_from_ops
+    >>> from pynw import needleman_wunsch, alignment_indices
     >>> seq1, seq2 = list("GATTACA"), list("GCATGCA")
     >>> sm = np.where(
     ...     np.array(seq1)[:, None] == np.array(seq2)[None, :], 1.0, -1.0
@@ -115,16 +115,16 @@ def needleman_wunsch(
     ...     (0, 1, -1.0),  # op 1: insert (gap in source)
     ...     (1, 0, -1.0),  # op 2: delete (gap in target)
     ... )
-    >>> source_idx, target_idx = indices_from_ops(ops, [1, 0, 1], [1, 1, 0])
+    >>> source_idx, target_idx = alignment_indices(ops, [1, 0, 1], [1, 1, 0])
     """
 ```
 
-### `indices_from_ops`
+### `alignment_indices`
 
 Takes caller-provided stride tables instead of a hardcoded enum:
 
 ```python
-def indices_from_ops(
+def alignment_indices(
     ops: npt.NDArray[np.uint8],
     source_strides: Sequence[int],
     target_strides: Sequence[int],
@@ -213,7 +213,7 @@ for op, rs, cs in iter_alignment(ops, source_strides, target_strides, seq1, seq2
 ```
 
 The signature must accept the stride tables so it can reconstruct positions for
-arbitrary caller-defined operations — mirroring `indices_from_ops`:
+arbitrary caller-defined operations — mirroring `alignment_indices`:
 
 ```python
 def iter_alignment(
@@ -587,18 +587,18 @@ fn needleman_wunsch<'py>(
 
 ### Python (`pynw/`)
 
-| File               | Action      | Description                                                                                               |
-| ------------------ | ----------- | --------------------------------------------------------------------------------------------------------- |
-| `pynw/__init__.py` | **Modify**  | Update `__all__`, add `align_setup` / `align_merge_split_setup`, remove `Op` re-export                    |
-| `pynw/_native.pyi` | **Rewrite** | New `needleman_wunsch` stub, remove `needleman_wunsch_merge_split` and `OP_*` constants                   |
-| `pynw/_ops.py`     | **Rewrite** | New `indices_from_ops(ops, source_strides, target_strides)`, remove `Op` enum and hardcoded stride tables |
+| File               | Action      | Description                                                                                                |
+| ------------------ | ----------- | ---------------------------------------------------------------------------------------------------------- |
+| `pynw/__init__.py` | **Modify**  | Update `__all__`, add `align_setup` / `align_merge_split_setup`, remove `Op` re-export                     |
+| `pynw/_native.pyi` | **Rewrite** | New `needleman_wunsch` stub, remove `needleman_wunsch_merge_split` and `OP_*` constants                    |
+| `pynw/_ops.py`     | **Rewrite** | New `alignment_indices(ops, source_strides, target_strides)`, remove `Op` enum and hardcoded stride tables |
 
 ### Tests (`tests/`)
 
 | File                                     | Action        | Description                                                                                                             |
 | ---------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `tests/helpers.py`                       | **Modify**    | Update `nw_score`, `recompute_score_from_indices`, `assert_structural_invariants` for ops-based return                  |
-| `tests/test_needleman_wunsch_api.py`     | **Modify**    | Migrate all tests to new API; every `score, ri, ci = ...` becomes `score, ops = ...; ri, ci = indices_from_ops(...)`    |
+| `tests/test_needleman_wunsch_api.py`     | **Modify**    | Migrate all tests to new API; every `score, ri, ci = ...` becomes `score, ops = ...; ri, ci = alignment_indices(...)`   |
 | `tests/test_edit_distance.py`            | **Modify**    | Same migration pattern                                                                                                  |
 | `tests/test_edit_distance_hypothesis.py` | **Modify**    | Same migration pattern                                                                                                  |
 | `tests/test_examples.py`                 | **No change** | Tests run code from docs; will pass once docs are updated                                                               |
@@ -634,7 +634,7 @@ fn needleman_wunsch<'py>(
 
 ### Phase 3: Python layer
 
-1. Rewrite `pynw/_ops.py`: new `indices_from_ops(ops, source_strides, target_strides)`.
+1. Rewrite `pynw/_ops.py`: new `alignment_indices(ops, source_strides, target_strides)`.
 2. Rewrite `pynw/_native.pyi`: new stub for `needleman_wunsch`.
 3. Update `pynw/__init__.py`: add convenience constructors, update `__all__`.
 
@@ -672,14 +672,14 @@ for i, j in zip(source_idx, target_idx):
 ### After (standard NW)
 
 ```python
-from pynw import needleman_wunsch, indices_from_ops, align_setup
+from pynw import needleman_wunsch, alignment_indices, align_setup
 
 ALIGN, INSERT, DELETE = 0, 1, 2
 SOURCE_STRIDES = [1, 0, 1]
 TARGET_STRIDES = [1, 1, 0]
 
 score, ops = needleman_wunsch(*align_setup(sm, gap_penalty=-1.0))
-source_idx, target_idx = indices_from_ops(ops, SOURCE_STRIDES, TARGET_STRIDES)
+source_idx, target_idx = alignment_indices(ops, SOURCE_STRIDES, TARGET_STRIDES)
 
 for op, i, j in zip(ops, source_idx, target_idx):
     if op == ALIGN:
@@ -693,18 +693,18 @@ for op, i, j in zip(ops, source_idx, target_idx):
 ### Before (merge/split)
 
 ```python
-from pynw import needleman_wunsch_merge_split, Op, indices_from_ops
+from pynw import needleman_wunsch_merge_split, Op, alignment_indices
 
 score, ops = needleman_wunsch_merge_split(
     align_scores, split_scores, merge_scores, gap_penalty=-0.5
 )
-source_idx, target_idx = indices_from_ops(ops)
+source_idx, target_idx = alignment_indices(ops)
 ```
 
 ### After (merge/split)
 
 ```python
-from pynw import needleman_wunsch, indices_from_ops, align_merge_split_setup
+from pynw import needleman_wunsch, alignment_indices, align_merge_split_setup
 
 score, ops = needleman_wunsch(*align_merge_split_setup(
     align_scores, split_scores, merge_scores, gap_penalty=-0.5
@@ -712,7 +712,7 @@ score, ops = needleman_wunsch(*align_merge_split_setup(
 # Op indices: 0=align, 1=insert, 2=delete, 3=split, 4=merge
 SOURCE_STRIDES = [1, 0, 1, 1, 2]
 TARGET_STRIDES = [1, 1, 0, 2, 1]
-source_idx, target_idx = indices_from_ops(ops, SOURCE_STRIDES, TARGET_STRIDES)
+source_idx, target_idx = alignment_indices(ops, SOURCE_STRIDES, TARGET_STRIDES)
 ```
 
 ### Future (2-to-2 swap, no API change)
@@ -726,7 +726,7 @@ score, ops = needleman_wunsch(
 )
 SOURCE_STRIDES = [1, 0, 1, 2]
 TARGET_STRIDES = [1, 1, 0, 2]
-source_idx, target_idx = indices_from_ops(ops, SOURCE_STRIDES, TARGET_STRIDES)
+source_idx, target_idx = alignment_indices(ops, SOURCE_STRIDES, TARGET_STRIDES)
 ```
 
 ## Performance Considerations
@@ -778,14 +778,14 @@ be documented.
 
 ## Open Questions
 
-1. **Should `indices_from_ops` move to Rust?** The current NumPy
+1. **Should `alignment_indices` move to Rust?** The current NumPy
    implementation is a one-liner (`cumsum` + index), so the overhead is
    negligible. Moving it to Rust adds complexity for no measurable gain.
    Recommendation: keep in Python.
 
 2. **Should the convenience constructors return stride tables too?**
    Currently `align_setup` returns just the operations tuple. The caller
-   still needs to know the stride tables for `indices_from_ops`. We could
+   still needs to know the stride tables for `alignment_indices`. We could
    return a richer object, but that adds API surface. Recommendation: for
    the common cases, document the stride tables. Advanced users building
    custom operations already know their strides.

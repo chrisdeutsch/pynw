@@ -38,25 +38,24 @@ Align two DNA sequences using a simple match/mismatch scoring scheme:
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch, iter_alignment
+from pynw import needleman_wunsch, alignment_indices
 
-seq1 = list("GATTACA")
-seq2 = list("GCATGCA")
+seq1 = np.array(list("GATTACA"))
+seq2 = np.array(list("GCATGCA"))
 
 # Build an (n, m) similarity matrix: +1 for match, -1 for mismatch
-similarity_matrix = np.where(
-    np.array(seq1)[:, None] == np.array(seq2)[None, :], 1.0, -1.0
-)
+similarity_matrix = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
 
 score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
 
-# iter_alignment yields (op, source_item, target_item); None signals a gap
-aligned1, aligned2 = "", ""
-for _, s, t in iter_alignment(ops, seq1, seq2):
-    aligned1 += s or "-"
-    aligned2 += t or "-"
+# alignment_indices returns masked index arrays; gaps are masked out
+src_idx, tgt_idx = alignment_indices(ops)
 
-print(f"Score: {score}\n{aligned1}\n{aligned2}")
+# Reconstruct aligned sequences with numpy fancy indexing
+aligned1 = np.where(src_idx.mask, "-", seq1[src_idx.data])
+aligned2 = np.where(tgt_idx.mask, "-", seq2[tgt_idx.data])
+
+print(f"Score: {score}\n{''.join(aligned1)}\n{''.join(aligned2)}")
 # Score: 2.0
 # G-ATTACA
 # GCA-TGCA

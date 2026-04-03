@@ -51,32 +51,24 @@ def needleman_wunsch(
     ops : ndarray of uint8, shape (k,)
         Sequence of edit operations describing the alignment.  Each element
         is of type ``EditOp``.  Use
-        ``iter_alignment`` to iterate over aligned element pairs, or
-        ``indices_from_ops`` to reconstruct source and target index arrays.
+        ``alignment_indices`` to reconstruct source and target index arrays.
 
     Examples
     --------
     Align two DNA sequences using a simple match/mismatch scoring scheme:
 
     >>> import numpy as np
-    >>> source_seq = list("GATTACA")
-    >>> target_seq = list("GCATGCA")
-    >>> match, mismatch = 1.0, -1.0
-    >>> sm = np.where(
-    ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :],
-    ...     match, mismatch,
-    ... )
-    >>> from pynw import iter_alignment
+    >>> from pynw import alignment_indices
+    >>> seq1 = np.array(list("GATTACA"))
+    >>> seq2 = np.array(list("GCATGCA"))
+    >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
     >>> score, ops = needleman_wunsch(sm, gap_penalty=-1.0)
     >>> score
     2.0
-    >>> cols = [
-    ...     (s or "-", t or "-")
-    ...     for _, s, t in iter_alignment(ops, source_seq, target_seq)
-    ... ]
-    >>> "".join(s for s, _ in cols)
+    >>> src_idx, tgt_idx = alignment_indices(ops)
+    >>> "".join(np.where(src_idx.mask, "-", seq1[src_idx.data]))
     'G-ATTACA'
-    >>> "".join(t for _, t in cols)
+    >>> "".join(np.where(tgt_idx.mask, "-", seq2[tgt_idx.data]))
     'GCA-TGCA'
 
     Notes
@@ -140,7 +132,7 @@ def needleman_wunsch_merge_split(
     ops : ndarray of uint8, shape (k,)
         Sequence of edit operations describing the alignment.  Each element
         is one of the ``OP_*`` constants (or ``Op`` enum values).  Use
-        ``indices_from_ops`` to reconstruct the source and target indices.
+        ``alignment_indices`` to reconstruct the source and target indices.
 
         +---------------+----------------------------------------------+
         | Op            | Meaning                                      |
