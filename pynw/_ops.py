@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable, Iterator
 from enum import IntEnum
-from typing import TypeVar, assert_never
+from typing import TypeAlias, TypeVar, assert_never
 
 import numpy as np
 import numpy.typing as npt
@@ -22,32 +22,49 @@ class EditOp(IntEnum):
     Delete = OP_DELETE
 
 
-_STRIDE_TABLE = np.zeros((2, max(EditOp) + 1), dtype=np.intp)
-_STRIDE_TABLE[:, EditOp.Align] = (1, 1)
-_STRIDE_TABLE[:, EditOp.Insert] = (0, 1)
-_STRIDE_TABLE[:, EditOp.Delete] = (1, 0)
-_STRIDE_TABLE.flags.writeable = False
+MaskedIndexArray: TypeAlias = np.ma.MaskedArray[tuple[int], np.dtype[np.intp]]
 
 
-def indices_from_ops_stride_table(
+def indices_from_ops(
     ops: npt.NDArray[np.uint8],
-) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]:
-    """Reconstruct source and target indices from an ops array."""
-    ops = np.asarray(ops, dtype=np.uint8)
+) -> tuple[MaskedIndexArray, MaskedIndexArray]:
+    """Reconstruct source and target indices from an ops array.
 
-    strides = _STRIDE_TABLE[:, ops]
-    idx = np.cumsum(strides, axis=-1) - strides
+    Converts a sequence of edit operations into a pair of masked index arrays.
+    Each array has one entry per alignment position.  Positions where the
+    corresponding sequence has a gap are masked out.
 
-    source_idx = np.ma.array(idx[0, :], mask=ops == EditOp.Insert)
-    target_idx = np.ma.array(idx[1, :], mask=ops == EditOp.Delete)
+    Parameters
+    ----------
+    ops : ndarray of uint8, shape (k,)
+        Edit-operation sequence returned by ``needleman_wunsch``.
 
-    return source_idx, target_idx
+    Returns
+    -------
+    source_idx : masked array of intp, shape (k,)
+        Index into the source sequence at each alignment position.
+        Masked (invalid) at insert positions (gap in source).
+    target_idx : masked array of intp, shape (k,)
+        Index into the target sequence at each alignment position.
+        Masked (invalid) at delete positions (gap in target).
 
-
-def indices_from_ops_direct(
-    ops: npt.NDArray[np.uint8],
-) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]:
-    """Reconstruct source and target indices from an ops array."""
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pynw import needleman_wunsch, indices_from_ops
+    >>> source_seq = list("GAT")
+    >>> target_seq = list("GT")
+    >>> sm = np.where(
+    ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :],
+    ...     1.0, -1.0,
+    ... )
+    >>> _, ops = needleman_wunsch(sm, gap_penalty=-1.0)
+    >>> src, tgt = indices_from_ops(ops)
+    >>> src.tolist()
+    [0, 1, 2]
+    >>> tgt.tolist()
+    [0, None, 1]
+    """
     ops = np.asarray(ops, dtype=np.uint8)
 
     insert_mask = ops == EditOp.Insert
