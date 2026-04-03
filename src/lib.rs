@@ -14,9 +14,9 @@ mod pynw_native {
 
     #[pymodule_init]
     fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        m.add("OP_ALIGN", nw::EditOp::Align as u8)?;
-        m.add("OP_INSERT", nw::EditOp::Insert as u8)?;
-        m.add("OP_DELETE", nw::EditOp::Delete as u8)?;
+        m.add("OP_ALIGN", u8::from(nw::EditOp::Align))?;
+        m.add("OP_INSERT", u8::from(nw::EditOp::Insert))?;
+        m.add("OP_DELETE", u8::from(nw::EditOp::Delete))?;
         Ok(())
     }
 
@@ -123,7 +123,7 @@ mod pynw_native {
 
         let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
 
-        let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
+        let ops: Vec<u8> = ops.into_iter().map(Into::into).collect();
         Ok((score, ops.into_pyarray(py)))
     }
 
@@ -142,14 +142,17 @@ mod pynw_native {
     ) -> PyResult<AlignmentIndicesResult<'py>> {
         let py_array = as_pyarray_u8(py, &ops)?;
         let u8_view = py_array.as_array();
-        // SAFETY: EditOp is #[repr(u8)] and needleman_wunsch only ever writes
-        // values 0 (Align), 1 (Insert), or 2 (Delete) into the ops array.
-        let ops_view = unsafe {
-            numpy::ndarray::ArrayView1::from_shape_ptr(
-                u8_view.raw_dim(),
-                u8_view.as_ptr() as *const nw::EditOp,
-            )
-        };
+
+        let ops: Vec<nw::EditOp> = u8_view
+            .iter()
+            .map(|&b| {
+                nw::EditOp::try_from(b).map_err(|_| {
+                    pyo3::exceptions::PyValueError::new_err("Cannot convert u8 into EditOp")
+                })
+            })
+            .collect::<PyResult<_>>()?;
+
+        let ops_view = numpy::ndarray::ArrayView1::from(ops.as_slice());
 
         let (src_idx, src_mask, tgt_idx, tgt_mask) = nw::alignment_indices(ops_view);
         Ok((

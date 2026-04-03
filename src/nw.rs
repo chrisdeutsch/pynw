@@ -23,9 +23,10 @@
 //! All values in the similarity matrix and gap penalties must be finite.
 //! Non-finite values (`NaN`, `Inf`) cause undefined output.
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use numpy::ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub(crate) enum EditOp {
     Align = 0,
