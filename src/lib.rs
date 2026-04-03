@@ -1,7 +1,8 @@
 //! PyO3 binding layer for the `pynw._native` extension module.
 
 use numpy::{
-    Element, IntoPyArray, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray2, get_array_module,
+    Element, IntoPyArray, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2,
+    get_array_module,
 };
 use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
@@ -125,6 +126,37 @@ mod pynw_native {
         let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
         Ok((score, ops.into_pyarray(py)))
     }
+
+    #[pyfunction]
+    #[pyo3(signature = (ops), text_signature = "(ops)")]
+    fn alignment_indices<'py>(
+        py: Python<'py>,
+        ops: Bound<'py, PyAny>,
+    ) -> PyResult<(
+        Bound<'py, PyArray1<isize>>,
+        Bound<'py, PyArray1<bool>>,
+        Bound<'py, PyArray1<isize>>,
+        Bound<'py, PyArray1<bool>>,
+    )> {
+        let py_array = as_pyarray_u8(py, &ops)?;
+        let u8_view = py_array.as_array();
+        // SAFETY: EditOp is #[repr(u8)] and needleman_wunsch only ever writes
+        // values 0 (Align), 1 (Insert), or 2 (Delete) into the ops array.
+        let ops_view = unsafe {
+            numpy::ndarray::ArrayView1::from_shape_ptr(
+                u8_view.raw_dim(),
+                u8_view.as_ptr() as *const nw::EditOp,
+            )
+        };
+
+        let (src_idx, src_mask, tgt_idx, tgt_mask) = nw::alignment_indices(ops_view);
+        Ok((
+            src_idx.into_pyarray(py),
+            src_mask.into_pyarray(py),
+            tgt_idx.into_pyarray(py),
+            tgt_mask.into_pyarray(py),
+        ))
+    }
 }
 
 fn as_pyarray<'py>(
@@ -155,6 +187,39 @@ fn as_pyarray<'py>(
         .map_err(|_| {
             pyo3::exceptions::PyValueError::new_err(
                 "Cannot convert array-like into 2-dimensional float64 array",
+            )
+        })?;
+
+    Ok(array)
+}
+
+fn as_pyarray_u8<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<PyReadonlyArray1<'py, u8>> {
+    // This is a modified version of the extract method of PyArrayLike to convert into a 1d u8 array
+
+    if let Ok(array) = obj.cast::<PyArray1<u8>>() {
+        return Ok(array.readonly());
+    }
+
+    static AS_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+
+    let as_array = AS_ARRAY
+        .get_or_try_init(py, || {
+            get_array_module(py)?.getattr("asarray").map(Into::into)
+        })?
+        .bind(py);
+
+    let kwargs = PyDict::new(py);
+    kwargs.set_item(intern!(py, "dtype"), u8::get_dtype(py))?;
+
+    let array = as_array
+        .call((obj,), Some(kwargs).as_ref())?
+        .extract()
+        .map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 1-dimensional u8 array",
             )
         })?;
 

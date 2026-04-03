@@ -23,9 +23,9 @@
 //! All values in the similarity matrix and gap penalties must be finite.
 //! Non-finite values (`NaN`, `Inf`) cause undefined output.
 
-use numpy::ndarray::{Array2, ArrayView2};
+use numpy::ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub(crate) enum EditOp {
     Align = 0,
@@ -45,6 +45,39 @@ pub(crate) fn needleman_wunsch(
 
     // TODO: Return array of scores?
     (score, ops)
+}
+
+pub(crate) fn alignment_indices(
+    ops: ArrayView1<EditOp>,
+) -> (Array1<isize>, Array1<bool>, Array1<isize>, Array1<bool>) {
+    let k = ops.len();
+
+    let mut source_idx = Array1::zeros(k);
+    let mut source_mask = Array1::from_elem(k, false);
+    let mut target_idx = Array1::zeros(k);
+    let mut target_mask = Array1::from_elem(k, false);
+
+    let mut si: isize = 0;
+    let mut ti: isize = 0;
+
+    for (i, &op) in ops.iter().enumerate() {
+        let is_insert = op == EditOp::Insert;
+        let is_delete = op == EditOp::Delete;
+
+        source_idx[i] = si;
+        source_mask[i] = is_insert;
+        target_idx[i] = ti;
+        target_mask[i] = is_delete;
+
+        if !is_insert {
+            si += 1;
+        }
+        if !is_delete {
+            ti += 1;
+        }
+    }
+
+    (source_idx, source_mask, target_idx, target_mask)
 }
 
 /// Build `(n+1, m+1)` DP score and traceback direction matrices.

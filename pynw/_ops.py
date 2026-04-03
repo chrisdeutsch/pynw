@@ -6,7 +6,14 @@ from typing import TypeAlias
 import numpy as np
 import numpy.typing as npt
 
-from pynw._native import OP_ALIGN, OP_DELETE, OP_INSERT
+from pynw._native import (
+    OP_ALIGN,
+    OP_DELETE,
+    OP_INSERT,
+)
+from pynw._native import (
+    alignment_indices as _native_alignment_indices,
+)
 
 
 class EditOp(IntEnum):
@@ -80,3 +87,10 @@ def alignment_indices(
     )
 
     return source_idx, target_idx
+
+
+def native_alignment_indices(
+    ops: npt.ArrayLike,
+) -> tuple[MaskedIndexArray, MaskedIndexArray]:
+    src_idx, src_mask, tgt_idx, tgt_mask = _native_alignment_indices(ops)
+    return np.ma.array(src_idx, mask=src_mask), np.ma.array(tgt_idx, mask=tgt_mask)
