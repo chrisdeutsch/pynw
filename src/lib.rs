@@ -84,6 +84,8 @@ mod pynw_native {
     /// substitutions over gaps, producing compact alignments.  Other tools
     /// may return different co-optimal alignments.
     ///
+    /// All values in ``similarity_matrix`` and the gap penalties must be finite.
+    ///
     #[pyfunction]
     #[pyo3(
         signature = (similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
