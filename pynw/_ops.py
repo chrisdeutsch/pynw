@@ -22,25 +22,47 @@ class EditOp(IntEnum):
     Delete = OP_DELETE
 
 
-_SOURCE_STRIDE = np.zeros(max(EditOp) + 1, dtype=np.intp)
-_SOURCE_STRIDE[EditOp.Align] = 1
-# INSERT = 0: no source element consumed
-_SOURCE_STRIDE[EditOp.Delete] = 1
-_SOURCE_STRIDE.flags.writeable = False
-
-_TARGET_STRIDE = np.zeros(max(EditOp) + 1, dtype=np.intp)
-_TARGET_STRIDE[EditOp.Align] = 1
-_TARGET_STRIDE[EditOp.Insert] = 1
-# DELETE = 0: no target element consumed
-_TARGET_STRIDE.flags.writeable = False
+_STRIDE_TABLE = np.zeros((2, max(EditOp) + 1), dtype=np.intp)
+_STRIDE_TABLE[:, EditOp.Align] = (1, 1)
+_STRIDE_TABLE[:, EditOp.Insert] = (0, 1)
+_STRIDE_TABLE[:, EditOp.Delete] = (1, 0)
+_STRIDE_TABLE.flags.writeable = False
 
 
-def indices_from_ops(
+def indices_from_ops_stride_table(
     ops: npt.NDArray[np.uint8],
 ) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]:
     """Reconstruct source and target indices from an ops array."""
-    source_idx = np.cumsum(_SOURCE_STRIDE[ops]) - _SOURCE_STRIDE[ops]
-    target_idx = np.cumsum(_TARGET_STRIDE[ops]) - _TARGET_STRIDE[ops]
+    ops = np.asarray(ops, dtype=np.uint8)
+
+    strides = _STRIDE_TABLE[:, ops]
+    idx = np.cumsum(strides, axis=-1) - strides
+
+    source_idx = np.ma.array(idx[0, :], mask=ops == EditOp.Insert)
+    target_idx = np.ma.array(idx[1, :], mask=ops == EditOp.Delete)
+
+    return source_idx, target_idx
+
+
+def indices_from_ops_direct(
+    ops: npt.NDArray[np.uint8],
+) -> tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]:
+    """Reconstruct source and target indices from an ops array."""
+    ops = np.asarray(ops, dtype=np.uint8)
+
+    insert_mask = ops == EditOp.Insert
+    delete_mask = ops == EditOp.Delete
+
+    source_advances = ~insert_mask
+    target_advances = ~delete_mask
+
+    source_idx = np.ma.array(
+        np.cumsum(source_advances) - source_advances, mask=insert_mask
+    )
+    target_idx = np.ma.array(
+        np.cumsum(target_advances) - target_advances, mask=delete_mask
+    )
+
     return source_idx, target_idx
 
 
