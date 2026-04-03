@@ -127,17 +127,19 @@ mod pynw_native {
         Ok((score, ops.into_pyarray(py)))
     }
 
+    type AlignmentIndicesResult<'py> = (
+        Bound<'py, PyArray1<isize>>,
+        Bound<'py, PyArray1<bool>>,
+        Bound<'py, PyArray1<isize>>,
+        Bound<'py, PyArray1<bool>>,
+    );
+
     #[pyfunction]
     #[pyo3(signature = (ops), text_signature = "(ops)")]
     fn alignment_indices<'py>(
         py: Python<'py>,
         ops: Bound<'py, PyAny>,
-    ) -> PyResult<(
-        Bound<'py, PyArray1<isize>>,
-        Bound<'py, PyArray1<bool>>,
-        Bound<'py, PyArray1<isize>>,
-        Bound<'py, PyArray1<bool>>,
-    )> {
+    ) -> PyResult<AlignmentIndicesResult<'py>> {
         let py_array = as_pyarray_u8(py, &ops)?;
         let u8_view = py_array.as_array();
         // SAFETY: EditOp is #[repr(u8)] and needleman_wunsch only ever writes

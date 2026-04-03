@@ -81,3 +81,31 @@ def needleman_wunsch(
     All values in ``similarity_matrix`` and the gap penalties must be finite.
     """
     ...
+
+def alignment_indices(
+    ops: npt.ArrayLike,
+) -> tuple[
+    npt.NDArray[np.intp],
+    npt.NDArray[np.bool_],
+    npt.NDArray[np.intp],
+    npt.NDArray[np.bool_],
+]:
+    """Reconstruct source and target index arrays from an ops array.
+
+    Parameters
+    ----------
+    ops : array_like of uint8, shape (k,)
+        Edit-operation sequence returned by ``needleman_wunsch``.
+
+    Returns
+    -------
+    src_idx : ndarray of intp, shape (k,)
+        Source sequence index at each alignment position.
+    src_mask : ndarray of bool, shape (k,)
+        True where the source sequence has a gap (insert positions).
+    tgt_idx : ndarray of intp, shape (k,)
+        Target sequence index at each alignment position.
+    tgt_mask : ndarray of bool, shape (k,)
+        True where the target sequence has a gap (delete positions).
+    """
+    ...
