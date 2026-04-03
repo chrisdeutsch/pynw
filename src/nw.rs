@@ -25,7 +25,7 @@
 
 use numpy::ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum EditOp {
     Align = 0,
@@ -61,19 +61,25 @@ pub(crate) fn alignment_indices(
     let mut ti: isize = 0;
 
     for (i, &op) in ops.iter().enumerate() {
-        let is_insert = op == EditOp::Insert;
-        let is_delete = op == EditOp::Delete;
-
         source_idx[i] = si;
-        source_mask[i] = is_insert;
         target_idx[i] = ti;
-        target_mask[i] = is_delete;
 
-        if !is_insert {
-            si += 1;
-        }
-        if !is_delete {
-            ti += 1;
+        match op {
+            EditOp::Align => {
+                // both advance
+                si += 1;
+                ti += 1;
+            }
+            EditOp::Insert => {
+                // gap in source; target advances
+                source_mask[i] = true;
+                ti += 1;
+            }
+            EditOp::Delete => {
+                // gap in target; source advances
+                target_mask[i] = true;
+                si += 1;
+            }
         }
     }
 
@@ -91,7 +97,7 @@ fn fill_matrices(
     delete_penalty: f64,
 ) -> (Array2<f64>, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let mut dp = Array2::<f64>::zeros((n + 1, m + 1));
+    let mut dp = Array2::zeros((n + 1, m + 1));
     let mut tb = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
     // First column: aligning i source-elements against nothing -> i target gaps.

@@ -1,6 +1,7 @@
 import pytest
 
-from pynw import EditOp, alignment_indices
+from pynw import EditOp
+from pynw import native_alignment_indices as alignment_indices
 
 
 @pytest.mark.parametrize(
