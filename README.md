@@ -15,9 +15,10 @@ sequences, or any domain where element order matters.
 
 ## Features
 
-- **Fast:** The alignment runs in $O(NM)$ time; a `1000x1000` matrix takes < 10ms on modern CPUs.
-- **NumPy-First:** The interface accepts NumPy arrays directly and requires no intermediate Python objects.
-- **Domain-Agnostic:** Operates on a precomputed similarity matrix, so any scoring function (e.g. distance metrics, semantic similarity) works out of the box.
+- **Fast:** Alignment runs in $O(nm)$ time; a `1000×1000` matrix takes <10 ms on modern CPUs.
+- **NumPy-first:** Accepts NumPy arrays directly — no intermediate Python objects.
+- **Domain-agnostic:** Operates on a precomputed similarity matrix, so any scoring function (distance metrics, semantic similarity, etc.) works out of the box.
+- **Asymmetric gaps:** Optionally set separate insert and delete penalties.
 
 ## Installation
 
@@ -37,28 +38,28 @@ Align two DNA sequences using a simple match/mismatch scoring scheme:
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch
+from pynw import needleman_wunsch, alignment_indices
 
-seq1 = list("GATTACA")
-seq2 = list("GCATGCA")
+seq1 = np.array(list("GATTACA"))
+seq2 = np.array(list("GCATGCA"))
 
-match, mismatch = 1.0, -1.0
-similarity_matrix = np.where(
-    np.array(seq1)[:, None] == np.array(seq2)[None, :], match, mismatch
-)
+# Build an (n, m) similarity matrix: +1 for match, -1 for mismatch
+similarity_matrix = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
 
-score, row_idx, col_idx = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
+score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
 
-aligned1 = "".join(seq1[i] if i >= 0 else "-" for i in row_idx)
-aligned2 = "".join(seq2[i] if i >= 0 else "-" for i in col_idx)
-print(f"Score: {score}\n{aligned1}\n{aligned2}")
+# alignment_indices returns masked index arrays; gaps are masked out
+src_idx, tgt_idx = alignment_indices(ops)
+
+# Reconstruct aligned sequences with numpy fancy indexing
+aligned1 = np.where(src_idx.mask, "-", seq1[src_idx.data])
+aligned2 = np.where(tgt_idx.mask, "-", seq2[tgt_idx.data])
+
+print(f"Score: {score}\n{''.join(aligned1)}\n{''.join(aligned2)}")
 # Score: 2.0
 # G-ATTACA
 # GCA-TGCA
 ```
-
-`row_idx` and `col_idx` map each alignment position to an index in the
-original sequence, with `-1` indicating a gap.
 
 ## Details
 
@@ -74,26 +75,28 @@ $O(nm)$ memory even when the scoring rule could be expressed more compactly.
 
 ### Scoring
 
-The total alignment score is the sum of similarity matrix entries for matched
+The total alignment score is the sum of similarity-matrix entries for matched
 positions and gap penalties for insertions/deletions. Gap penalties are
-typically negative.
+typically negative. By default a single `gap_penalty` applies to both
+directions; set `insert_penalty` and/or `delete_penalty` to penalise them
+independently.
 
 When multiple alignments achieve the same optimal score, `pynw` breaks ties
 deterministically: `Diagonal > Up > Left`.
 
 ### Edit-distance parameterizations
 
-Needleman-Wunsch can reproduce common metrics with the right scoring
-parameters:
+Needleman-Wunsch can reproduce common metrics with the right similarity-matrix
+values and gap penalty:
 
-| Metric               | match | mismatch | gap      | NW score equals |
-|----------------------|-------|----------|----------|-----------------|
-| Levenshtein distance | 0     | -1       | -1       | `-distance`     |
-| Indel distance       | 0     | -2       | -1       | `-distance`     |
-| LCS length           | 1     | 0        | 0        | `lcs_length`    |
-| Hamming distance     | 0     | -1       | `-(n+1)` | `-distance`     |
+| Metric               | `S[i,j]` match | `S[i,j]` mismatch | `gap_penalty` | NW score equals |
+| -------------------- | -------------- | ----------------- | ------------- | --------------- |
+| Levenshtein distance | 0              | -1                | -1            | `-distance`     |
+| Indel distance       | 0              | -2                | -1            | `-distance`     |
+| LCS length           | 1              | 0                 | 0             | `lcs_length`    |
+| Hamming distance     | 0              | -1                | `-(n+1)`      | `-distance`     |
 
-For Hamming, strings must have equal length.
+For Hamming distance, strings must have equal length.
 
 ## API
 
@@ -114,7 +117,6 @@ This repository uses [pixi](https://pixi.sh) for development:
 pixi install
 pixi run build            # build the Rust extension
 pixi run test             # run deterministic tests
-pixi run test-hypothesis  # run property-based tests
 pixi run lint             # run all pre-commit checks (ruff, cargo fmt, markdownlint, actionlint)
 pixi run check            # run all pre-push checks (cargo clippy, mypy)
 pixi run docs             # generate API docs in site/

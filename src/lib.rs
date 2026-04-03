@@ -7,6 +7,124 @@ use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
 mod nw;
 
+#[pymodule(name = "_native")]
+mod pynw_native {
+    use super::*;
+
+    #[pymodule_init]
+    fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        m.add("OP_ALIGN", nw::EditOp::Align as u8)?;
+        m.add("OP_INSERT", nw::EditOp::Insert as u8)?;
+        m.add("OP_DELETE", nw::EditOp::Delete as u8)?;
+        Ok(())
+    }
+
+    // NOTE: This doc comment provides the runtime `help()` docstring.
+    // A copy exists in pynw/_native.pyi for type checkers and IDE support.
+    // Keep both copies in sync.
+    //
+    /// Align two ordered sequences given a precomputed similarity matrix.
+    ///
+    /// The total alignment score is the sum of similarity-matrix entries for
+    /// matched positions and gap penalties for insertions/deletions.
+    ///
+    /// Parameters
+    /// ----------
+    /// similarity_matrix : array_like, shape (n, m)
+    ///     ``similarity_matrix[i, j]`` is the similarity score for aligning
+    ///     element *i* of the source sequence with element *j* of the target
+    ///     sequence.
+    /// gap_penalty : float, default -1.0
+    ///     Penalty applied when a gap is inserted in either sequence.
+    ///     Use ``insert_penalty`` or ``delete_penalty`` to set them
+    ///     independently.
+    /// insert_penalty : float, optional
+    ///     Penalty for advancing the target sequence without consuming a source
+    ///     element (gap in source).  Defaults to ``gap_penalty``.
+    /// delete_penalty : float, optional
+    ///     Penalty for advancing the source sequence without consuming a target
+    ///     element (gap in target).  Defaults to ``gap_penalty``.
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``similarity_matrix`` is not 2-dimensional, or if any value in
+    ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
+    ///
+    /// Returns
+    /// -------
+    /// score : float
+    ///     The optimal alignment score.
+    /// ops : ndarray of uint8, shape (k,)
+    ///     Sequence of edit operations describing the alignment.  Each element
+    ///     is of type ``EditOp``.  Use
+    ///     ``alignment_indices`` to reconstruct source and target index arrays.
+    ///
+    /// Examples
+    /// --------
+    /// Align two DNA sequences using a simple match/mismatch scoring scheme:
+    ///
+    /// >>> import numpy as np
+    /// >>> from pynw import alignment_indices
+    /// >>> seq1 = np.array(list("GATTACA"))
+    /// >>> seq2 = np.array(list("GCATGCA"))
+    /// >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
+    /// >>> score, ops = needleman_wunsch(sm, gap_penalty=-1.0)
+    /// >>> score
+    /// 2.0
+    /// >>> src_idx, tgt_idx = alignment_indices(ops)
+    /// >>> "".join(np.where(src_idx.mask, "-", seq1[src_idx.data]))
+    /// 'G-ATTACA'
+    /// >>> "".join(np.where(tgt_idx.mask, "-", seq2[tgt_idx.data]))
+    /// 'GCA-TGCA'
+    ///
+    /// Notes
+    /// -----
+    /// When multiple alignments achieve the same optimal score, ties are
+    /// broken deterministically: ``Diagonal > Up > Left``.  This prefers
+    /// substitutions over gaps, producing compact alignments.  Other tools
+    /// may return different co-optimal alignments.
+    ///
+    #[pyfunction]
+    #[pyo3(
+        signature = (similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
+        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None)",
+    )]
+    fn needleman_wunsch<'py>(
+        py: Python<'py>,
+        similarity_matrix: Bound<'py, PyAny>,
+        gap_penalty: f64,
+        insert_penalty: Option<f64>,
+        delete_penalty: Option<f64>,
+    ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
+        let py_array = as_pyarray(py, &similarity_matrix)?;
+        let similarity_matrix = py_array.as_array();
+
+        let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
+        let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
+
+        if !insert_penalty.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "insert_penalty is non-finite",
+            ));
+        }
+        if !delete_penalty.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "delete_penalty is non-finite",
+            ));
+        }
+        if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "similarity_matrix contains non-finite values (NaN or Inf)",
+            ));
+        }
+
+        let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
+
+        let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
+        Ok((score, ops.into_pyarray(py)))
+    }
+}
+
 fn as_pyarray<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
@@ -39,141 +157,4 @@ fn as_pyarray<'py>(
         })?;
 
     Ok(array)
-}
-
-type NeedlemanWunschResultType<'py> = (
-    f64,
-    Bound<'py, PyArray1<isize>>,
-    Bound<'py, PyArray1<isize>>,
-);
-
-#[pymodule(name = "_native")]
-mod pynw_native {
-    use super::*;
-
-    // NOTE: This doc comment provides the runtime `help()` docstring.
-    // A copy exists in pynw/_native.pyi for type checkers and IDE support.
-    // Keep both copies in sync.
-    //
-    /// Align two ordered sequences given a precomputed similarity matrix.
-    ///
-    /// The total alignment score is the sum of similarity-matrix entries for
-    /// matched positions and gap penalties for insertions/deletions.
-    ///
-    /// Parameters
-    /// ----------
-    /// similarity_matrix : array_like, shape (n, m)
-    ///     ``similarity_matrix[i, j]`` is the similarity score for aligning
-    ///     element *i* of the row sequence with element *j* of the column
-    ///     sequence.
-    /// gap_penalty : float, default -1.0
-    ///     Penalty applied when a gap is inserted in either sequence.
-    ///     Use ``gap_penalty_row`` or ``gap_penalty_col`` to specify
-    ///     different penalties for each sequence.
-    /// gap_penalty_row : float, optional
-    ///     Penalty added when a gap is inserted in the row sequence
-    ///     (the column sequence advances). This can be thought of as the
-    ///     cost of a deletion from the row sequence or an insertion into the
-    ///     column sequence.
-    ///     Defaults to ``gap_penalty`` if not specified.
-    /// gap_penalty_col : float, optional
-    ///     Penalty added when a gap is inserted in the column sequence
-    ///     (the row sequence advances). This can be thought of as the cost
-    ///     of a deletion from the column sequence or an insertion into the
-    ///     row sequence.
-    ///     Defaults to ``gap_penalty`` if not specified.
-    /// check_finite : bool, default False
-    ///     If ``True``, raise a ``ValueError`` when ``similarity_matrix``
-    ///     or the gap penalties contain ``NaN`` or ``Inf``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``similarity_matrix`` is not 2-dimensional, or if
-    ///     ``check_finite`` is ``True`` and any value in
-    ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
-    ///
-    /// Returns
-    /// -------
-    /// score : float
-    ///     The optimal alignment score.
-    /// row_idx : ndarray of intp
-    ///     Index into the row sequence at each alignment position, or ``-1``
-    ///     for a gap.
-    /// col_idx : ndarray of intp
-    ///     Index into the column sequence at each alignment position, or ``-1``
-    ///     for a gap.
-    ///
-    /// Examples
-    /// --------
-    /// Align two DNA sequences using a simple match/mismatch scoring scheme:
-    ///
-    /// >>> import numpy as np
-    /// >>> row_seq = list("GATTACA")
-    /// >>> col_seq = list("GCATGCA")
-    /// >>> match, mismatch = 1.0, -1.0
-    /// >>> sm = np.where(
-    /// ...     np.array(row_seq)[:, None] == np.array(col_seq)[None, :],
-    /// ...     match, mismatch,
-    /// ... )
-    /// >>> score, row_idx, col_idx = needleman_wunsch(sm, gap_penalty=-1.0)
-    /// >>> score
-    /// 2.0
-    /// >>> "".join(row_seq[i] if i >= 0 else "-" for i in row_idx)
-    /// 'G-ATTACA'
-    /// >>> "".join(col_seq[i] if i >= 0 else "-" for i in col_idx)
-    /// 'GCA-TGCA'
-    ///
-    /// Notes
-    /// -----
-    /// When multiple alignments achieve the same optimal score, ties are
-    /// broken deterministically: ``Diagonal > Up > Left``.  This prefers
-    /// substitutions over gaps, producing compact alignments.  Other tools
-    /// may return different co-optimal alignments.
-    ///
-    /// All values in ``similarity_matrix`` and the gap penalties must be finite.
-    /// Passing ``NaN`` or ``Inf`` is undefined behavior — the output will be
-    /// silently meaningless.
-    #[pyfunction]
-    #[pyo3(
-        signature = (similarity_matrix, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=false),
-        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, gap_penalty_row=None, gap_penalty_col=None, check_finite=False)",
-    )]
-    fn needleman_wunsch<'py>(
-        py: Python<'py>,
-        similarity_matrix: Bound<'py, PyAny>,
-        gap_penalty: f64,
-        gap_penalty_row: Option<f64>,
-        gap_penalty_col: Option<f64>,
-        check_finite: bool,
-    ) -> PyResult<NeedlemanWunschResultType<'py>> {
-        let py_array = as_pyarray(py, &similarity_matrix)?;
-        let similarity_matrix = py_array.as_array();
-
-        let gap_penalty_row = gap_penalty_row.unwrap_or(gap_penalty);
-        let gap_penalty_col = gap_penalty_col.unwrap_or(gap_penalty);
-
-        if check_finite {
-            if !gap_penalty_row.is_finite() {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_row is non-finite",
-                ));
-            }
-            if !gap_penalty_col.is_finite() {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "gap_penalty_col is non-finite",
-                ));
-            }
-            if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "similarity_matrix contains non-finite values (NaN or Inf)",
-                ));
-            }
-        }
-
-        let (score, row_idx, col_idx) =
-            nw::needleman_wunsch(&similarity_matrix, gap_penalty_row, gap_penalty_col);
-
-        Ok((score, row_idx.into_pyarray(py), col_idx.into_pyarray(py)))
-    }
 }

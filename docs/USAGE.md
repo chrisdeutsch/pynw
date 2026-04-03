@@ -8,11 +8,11 @@ without a close match are gapped, so you can see which entries were dropped.
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch
+from pynw import needleman_wunsch, alignment_indices
 from rapidfuzz.process import cdist
 from rapidfuzz.fuzz import ratio
 
-row_seq = np.array([
+source_seq = np.array([
     "Episode I - The Phantom Menace",
     "Episode II - Attack of the Clones",
     "Episode III - Revenge of the Sith",
@@ -21,20 +21,23 @@ row_seq = np.array([
     "Episode VI - Return of the Jedi",
 ])
 
-col_seq = np.array([
+target_seq = np.array([
     "Attack of the Clones",
     "A New Hope",
     "The Empire Strikes Back",
     "Return of the Jedi",
 ])
 
-score = cdist(row_seq, col_seq, scorer=ratio) / 100
-_, row_idx, col_idx = needleman_wunsch(score)
-row_items = np.where(row_idx >= 0, row_seq[row_idx], "GAP")
-col_items = np.where(col_idx >= 0, col_seq[col_idx], "GAP")
+score = cdist(source_seq, target_seq, scorer=ratio) / 100
+_, ops = needleman_wunsch(score)
 
-for row_item, col_item in zip(row_items, col_items):
-    print(f"{row_item:40} -> {col_item}")
+src_idx, tgt_idx = alignment_indices(ops)
+
+aligned_src = np.where(src_idx.mask, "GAP", source_seq[src_idx.data])
+aligned_tgt = np.where(tgt_idx.mask, "GAP", target_seq[tgt_idx.data])
+
+for s, t in zip(aligned_src, aligned_tgt):
+    print(f"{s:40} -> {t}")
 ```
 
 Expected output:
@@ -57,7 +60,7 @@ A powerful use-case for sequence alignment is comparing drafts of documents wher
 Standard sequence alignment rewards exact matches and penalizes gaps (insertions/deletions). To adapt this for semantic comparisons, we use two tricks:
 
 1. **Shift the Scoring Matrix:** Cosine similarity yields values between `-1` and `1`. By defining a matching threshold (e.g., `0.65`) and subtracting it from the similarities, good matches become positive scores, and poor matches become negative scores.
-2. **Zero Gap Penalties:** By setting gap penalties to `0.0`, there is no inherent punishment for skipping a sentence. The algorithm will strictly prefer to align sentences *only* if their similarity is above the threshold (since that's the only way to increase the total score), elegantly handling completely new or deleted paragraphs.
+2. **Zero Gap Penalties:** By setting gap penalties to `0.0`, there is no inherent punishment for skipping a sentence. The algorithm will strictly prefer to align sentences _only_ if their similarity is above the threshold (since that's the only way to increase the total score), elegantly handling completely new or deleted paragraphs.
 
 Here we use the lightweight, CPU-friendly [`fastembed`](https://qdrant.github.io/fastembed/) library to compute cosine similarities to construct our score matrix.
 
@@ -68,7 +71,7 @@ uv pip install fastembed numpy
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch
+from pynw import needleman_wunsch, alignment_indices
 from fastembed import TextEmbedding
 
 # Initialize the embedding model
@@ -111,19 +114,23 @@ similarity_matrix = cosine_sim - threshold
 # 4. Run alignment
 # We set gap penalties to 0.0. The algorithm will naturally align sentences
 # that score > 0 (similarity > threshold), and insert gaps otherwise.
-score, row_idx, col_idx = needleman_wunsch(similarity_matrix, gap_penalty=0.0)
+_, ops = needleman_wunsch(similarity_matrix, gap_penalty=0.0)
 
 # 5. Print the Semantic Diff
+src_idx, tgt_idx = alignment_indices(ops)
+
 print("--- Semantic Document Diff ---\n")
-for i1, i2 in zip(row_idx, col_idx):
-    if i1 >= 0 and i2 >= 0:
+for i1, i2, src_gap, tgt_gap in zip(
+    src_idx.data, tgt_idx.data, src_idx.mask, tgt_idx.mask
+):
+    if not src_gap and not tgt_gap:
         print(f"[ MATCH ] (sim: {cosine_sim[i1, i2]:.2f})")
         print(f"  - {draft[i1]}")
         print(f"  + {final_rev[i2]}\n")
-    elif i1 >= 0:
+    elif not src_gap:
         print(f"[ DELETED ]")
         print(f"  - {draft[i1]}\n")
-    elif i2 >= 0:
+    else:
         print(f"[ INSERTED ]")
         print(f"  + {final_rev[i2]}\n")
 ```
@@ -133,25 +140,25 @@ Expected output:
 ```text
 --- Semantic Document Diff ---
 
-[ MATCH ] (sim: 0.86)
+[ MATCH ]
   - The company was founded in 2012 by two friends.
   + Two university buddies established the corp in 2012.
 
-[ MATCH ] (sim: 0.81)
+[ MATCH ]
   - They started working in a small garage.
   + Their origins trace back to a tiny residential garage.
 
 [ DELETED ]
   - Initially, they struggled to find investors.
 
-[ MATCH ] (sim: 0.70)
+[ MATCH ]
   - However, their first product was a big hit.
   + After several months, they launched a successful app.
 
 [ INSERTED ]
   + They recently expanded to the European market.
 
-[ MATCH ] (sim: 0.91)
+[ MATCH ]
   - Today, they employ over 500 people.
   + Currently, the workforce consists of 500+ employees.
 ```

@@ -7,15 +7,25 @@ import pytest
 from inline_snapshot import snapshot
 
 
-def _extract_python_blocks(markdown: str) -> list[str]:
-    """Extract fenced Python code blocks from a Markdown string."""
-    return re.findall(r"```python[^\n]*\n(.*?)```", markdown, re.DOTALL)
+def _extract_python_blocks(markdown: str) -> list[tuple[str, int]]:
+    """Extract fenced Python code blocks from a Markdown string.
+
+    Returns a list of (block_source, line_offset) tuples where line_offset is the
+    number of lines preceding the block in the original file.
+    """
+    results = []
+    for m in re.finditer(r"```python[^\n]*\n(.*?)```", markdown, re.DOTALL):
+        line_offset = markdown[: m.start(1)].count("\n")
+        results.append((m.group(1), line_offset))
+    return results
 
 
-def _exec_block(block: str, name: str) -> dict[str, Any]:
+def _exec_block(block: str, name: str, line_offset: int = 0) -> dict[str, Any]:
     """Execute a code block and return its namespace."""
     ns: dict[str, Any] = {}
-    exec(compile(block, name, "exec"), ns)
+    # Prepend empty lines so traceback line numbers match the source file.
+    padded = "\n" * line_offset + block
+    exec(compile(padded, name, "exec"), ns)
     return ns
 
 
@@ -27,8 +37,10 @@ GCA-TGCA
 
 
 def test_quickstart_example(repo_root, capsys):
-    (block,) = _extract_python_blocks((repo_root / "README.md").read_text())
-    _exec_block(block, "README.md")
+    ((block, start_line),) = _extract_python_blocks(
+        (repo_root / "README.md").read_text()
+    )
+    _exec_block(block, "README.md", start_line)
     assert capsys.readouterr().out == QUICKSTART_EXPECTED_OUTPUT
 
 
@@ -43,8 +55,11 @@ Episode VI - Return of the Jedi          -> Return of the Jedi
 
 
 def test_usage_global_alignment(repo_root, capsys):
-    blocks = _extract_python_blocks((repo_root / "docs" / "USAGE.md").read_text())
-    _exec_block(blocks[0], "USAGE.md - Global Alignment")
+    fp = repo_root / "docs" / "USAGE.md"
+    blocks = _extract_python_blocks(fp.read_text())
+
+    block, start_line = blocks[0]
+    _exec_block(block, fp, start_line)
     assert capsys.readouterr().out == USAGE_GLOBAL_ALIGNMENT_EXPECTED_OUTPUT
 
 
@@ -80,6 +95,9 @@ USAGE_SEMANTIC_DIFF_EXPECTED_OUTPUT = snapshot("""\
 def test_usage_semantic_diff(repo_root, capsys):
     pytest.importorskip("fastembed")
 
-    blocks = _extract_python_blocks((repo_root / "docs" / "USAGE.md").read_text())
-    _exec_block(blocks[1], "USAGE.md - Semantic Diff")
+    fp = repo_root / "docs" / "USAGE.md"
+    blocks = _extract_python_blocks(fp.read_text())
+
+    block, start_line = blocks[1]
+    _exec_block(block, fp, start_line)
     assert capsys.readouterr().out == USAGE_SEMANTIC_DIFF_EXPECTED_OUTPUT
