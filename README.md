@@ -47,13 +47,11 @@ seq2 = np.array(list("GCATGCA"))
 similarity_matrix = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
 
 score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
-
-# alignment_indices returns masked index arrays; gaps are masked out
 src_idx, tgt_idx = alignment_indices(ops)
 
-# Reconstruct aligned sequences with numpy fancy indexing
-aligned1 = np.where(src_idx.mask, "-", seq1[src_idx.data])
-aligned2 = np.where(tgt_idx.mask, "-", seq2[tgt_idx.data])
+# Reconstruct aligned sequences; masked positions are gaps
+aligned1 = np.ma.array(seq1[src_idx], mask=src_idx.mask).filled("-")
+aligned2 = np.ma.array(seq2[tgt_idx], mask=tgt_idx.mask).filled("-")
 
 print(f"Score: {score}\n{''.join(aligned1)}\n{''.join(aligned2)}")
 # Score: 2.0
@@ -117,8 +115,7 @@ This repository uses [pixi](https://pixi.sh) for development:
 pixi install
 pixi run build            # build the Rust extension
 pixi run test             # run deterministic tests
-pixi run test-hypothesis  # run property-based tests
-pixi run lint             # run all pre-commit checks (ruff, cargo fmt, markdownlint, actionlint)
+pixi run lint             # run all pre-commit checks (ruff, cargo fmt, prettier, markdownlint, taplo, actionlint)
 pixi run check            # run all pre-push checks (cargo clippy, mypy)
 pixi run docs             # generate API docs in site/
 pixi run docs-serve       # serve API docs in the browser

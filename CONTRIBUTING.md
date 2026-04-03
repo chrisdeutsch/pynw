@@ -37,8 +37,8 @@ Before submitting a pull request, make sure the following pass:
 
 ```bash
 pixi run test             # deterministic tests
-pixi run test-hypothesis  # property-based tests
-pixi run lint             # formatting & linting (ruff, cargo fmt, markdownlint, taplo)
+pixi run test -- -m hypothesis  # property-based tests
+pixi run lint             # formatting & linting (ruff, cargo fmt, prettier, markdownlint, taplo, actionlint)
 pixi run check            # static analysis (clippy, mypy)
 ```
 
