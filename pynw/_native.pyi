@@ -66,9 +66,9 @@ def needleman_wunsch(
     >>> score
     2.0
     >>> src_idx, tgt_idx = alignment_indices(ops)
-    >>> "".join(np.where(src_idx.mask, "-", seq1[src_idx.data]))
+    >>> "".join(np.ma.array(seq1).take(src_idx).filled("-"))
     'G-ATTACA'
-    >>> "".join(np.where(tgt_idx.mask, "-", seq2[tgt_idx.data]))
+    >>> "".join(np.ma.array(seq2).take(tgt_idx).filled("-"))
     'GCA-TGCA'
 
     Notes
