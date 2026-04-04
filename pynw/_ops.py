@@ -75,6 +75,15 @@ def alignment_indices(
         Index into the target sequence at each alignment position.
         Masked (invalid) at delete positions (gap in target).
 
+    Raises
+    ------
+    ValueError
+        If ``ops`` cannot be converted to a 1-D ``uint8`` array, or if any
+        element is not a valid ``EditOp`` discriminant.
+    OverflowError
+        If ``ops`` contains Python integers too large to convert to an 8-bit
+        unsigned integer.
+
     Examples
     --------
     >>> import numpy as np
