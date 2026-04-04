@@ -34,6 +34,11 @@ pub(crate) enum EditOp {
     Delete = 2,
 }
 
+pub(crate) struct MaskedIndexArray {
+    pub indices: Array1<isize>,
+    pub mask: Array1<bool>,
+}
+
 pub(crate) fn needleman_wunsch(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
@@ -48,43 +53,45 @@ pub(crate) fn needleman_wunsch(
     (score, ops)
 }
 
-pub(crate) fn alignment_indices(
-    ops: ArrayView1<EditOp>,
-) -> (Array1<isize>, Array1<bool>, Array1<isize>, Array1<bool>) {
+pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
     let k = ops.len();
 
-    let mut source_idx = Array1::zeros(k);
-    let mut source_mask = Array1::from_elem(k, false);
-    let mut target_idx = Array1::zeros(k);
-    let mut target_mask = Array1::from_elem(k, false);
+    let mut source = MaskedIndexArray {
+        indices: Array1::zeros(k),
+        mask: Array1::from_elem(k, false),
+    };
+    let mut target = MaskedIndexArray {
+        indices: Array1::zeros(k),
+        mask: Array1::from_elem(k, false),
+    };
 
-    let mut si: isize = 0;
-    let mut ti: isize = 0;
+    let mut source_index: isize = 0;
+    let mut target_index: isize = 0;
 
     for (i, &op) in ops.iter().enumerate() {
-        source_idx[i] = si;
-        target_idx[i] = ti;
+        source.indices[i] = source_index;
+        target.indices[i] = target_index;
 
         match op {
             EditOp::Align => {
                 // both advance
-                si += 1;
-                ti += 1;
+                source_index += 1;
+                target_index += 1;
             }
             EditOp::Insert => {
                 // gap in source; target advances
-                source_mask[i] = true;
-                ti += 1;
+                source.mask[i] = true;
+                target_index += 1;
             }
             EditOp::Delete => {
                 // gap in target; source advances
-                target_mask[i] = true;
-                si += 1;
+                target.mask[i] = true;
+                source_index += 1;
             }
         }
     }
 
-    (source_idx, source_mask, target_idx, target_mask)
+    (source, target)
 }
 
 /// Build `(n+1, m+1)` DP score and traceback direction matrices.

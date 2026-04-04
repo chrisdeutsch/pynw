@@ -154,12 +154,13 @@ mod pynw_native {
 
         let ops_view = numpy::ndarray::ArrayView1::from(ops.as_slice());
 
-        let (src_idx, src_mask, tgt_idx, tgt_mask) = nw::alignment_indices(ops_view);
+        let (source, target) = nw::alignment_indices(ops_view);
+
         Ok((
-            src_idx.into_pyarray(py),
-            src_mask.into_pyarray(py),
-            tgt_idx.into_pyarray(py),
-            tgt_mask.into_pyarray(py),
+            source.indices.into_pyarray(py),
+            source.mask.into_pyarray(py),
+            target.indices.into_pyarray(py),
+            target.mask.into_pyarray(py),
         ))
     }
 }
