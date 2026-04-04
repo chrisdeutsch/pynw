@@ -11,9 +11,7 @@ from pynw._native import (
     OP_DELETE,
     OP_INSERT,
 )
-from pynw._native import (
-    alignment_indices as _native_alignment_indices,
-)
+from pynw._native import alignment_indices as _alignment_indices
 
 
 class EditOp(IntEnum):
@@ -29,6 +27,29 @@ class EditOp(IntEnum):
 
 
 MaskedIndexArray: TypeAlias = np.ma.MaskedArray[tuple[int], np.dtype[np.intp]]
+
+
+# This is faster for extremely large k (k > 10000). Maybe due to hardware-level
+# vectorization?
+def _alignment_indices_numpy(
+    ops: npt.ArrayLike,
+) -> tuple[MaskedIndexArray, MaskedIndexArray]:
+    ops = np.asarray(ops, dtype=np.uint8)
+
+    insert_mask = ops == EditOp.Insert
+    delete_mask = ops == EditOp.Delete
+
+    source_advances = ~insert_mask
+    target_advances = ~delete_mask
+
+    source_idx = np.ma.array(
+        np.cumsum(source_advances) - source_advances, mask=insert_mask
+    )
+    target_idx = np.ma.array(
+        np.cumsum(target_advances) - target_advances, mask=delete_mask
+    )
+
+    return source_idx, target_idx
 
 
 def alignment_indices(
@@ -71,26 +92,5 @@ def alignment_indices(
     >>> tgt.tolist()
     [0, None, 1]
     """
-    ops = np.asarray(ops, dtype=np.uint8)
-
-    insert_mask = ops == EditOp.Insert
-    delete_mask = ops == EditOp.Delete
-
-    source_advances = ~insert_mask
-    target_advances = ~delete_mask
-
-    source_idx = np.ma.array(
-        np.cumsum(source_advances) - source_advances, mask=insert_mask
-    )
-    target_idx = np.ma.array(
-        np.cumsum(target_advances) - target_advances, mask=delete_mask
-    )
-
-    return source_idx, target_idx
-
-
-def native_alignment_indices(
-    ops: npt.ArrayLike,
-) -> tuple[MaskedIndexArray, MaskedIndexArray]:
-    src_idx, src_mask, tgt_idx, tgt_mask = _native_alignment_indices(ops)
+    src_idx, src_mask, tgt_idx, tgt_mask = _alignment_indices(ops)
     return np.ma.array(src_idx, mask=src_mask), np.ma.array(tgt_idx, mask=tgt_mask)
