@@ -50,8 +50,8 @@ score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
 src_idx, tgt_idx = alignment_indices(ops)
 
 # Reconstruct aligned sequences; masked positions are gaps
-aligned1 = np.ma.array(seq1[src_idx], mask=src_idx.mask).filled("-")
-aligned2 = np.ma.array(seq2[tgt_idx], mask=tgt_idx.mask).filled("-")
+aligned1 = np.ma.array(seq1).take(src_idx).filled("-")
+aligned2 = np.ma.array(seq2).take(tgt_idx).filled("-")
 
 print(f"Score: {score}\n{''.join(aligned1)}\n{''.join(aligned2)}")
 # Score: 2.0

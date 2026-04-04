@@ -30,14 +30,13 @@ target_seq = np.array([
 
 score = cdist(source_seq, target_seq, scorer=ratio) / 100
 _, ops = needleman_wunsch(score)
+source_idx, target_idx = alignment_indices(ops)
 
-src_idx, tgt_idx = alignment_indices(ops)
+source_aligned = np.ma.array(source_seq).take(source_idx)
+target_aligned = np.ma.array(target_seq).take(target_idx)
 
-aligned_src = np.where(src_idx.mask, "GAP", source_seq[src_idx.data])
-aligned_tgt = np.where(tgt_idx.mask, "GAP", target_seq[tgt_idx.data])
-
-for s, t in zip(aligned_src, aligned_tgt):
-    print(f"{s:40} -> {t}")
+for s, t in zip(source_aligned, target_aligned):
+    print(f"{s:35}  ->  {t}")
 ```
 
 Expected output:

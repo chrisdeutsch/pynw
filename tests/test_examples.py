@@ -45,12 +45,12 @@ def test_quickstart_example(repo_root, capsys):
 
 
 USAGE_GLOBAL_ALIGNMENT_EXPECTED_OUTPUT = snapshot("""\
-Episode I - The Phantom Menace           -> GAP
-Episode II - Attack of the Clones        -> Attack of the Clones
-Episode III - Revenge of the Sith        -> GAP
-Episode IV - A New Hope                  -> A New Hope
-Episode V - The Empire Strikes Back      -> The Empire Strikes Back
-Episode VI - Return of the Jedi          -> Return of the Jedi
+Episode I - The Phantom Menace       ->  --
+Episode II - Attack of the Clones    ->  Attack of the Clones
+Episode III - Revenge of the Sith    ->  --
+Episode IV - A New Hope              ->  A New Hope
+Episode V - The Empire Strikes Back  ->  The Empire Strikes Back
+Episode VI - Return of the Jedi      ->  Return of the Jedi
 """)
 
 
