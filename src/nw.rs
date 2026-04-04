@@ -15,7 +15,7 @@
 //! )
 //! ```
 //!
-//! Tie-breaking is deterministic: **diagonal > up > left**. This produces
+//! Tie-breaking is deterministic: **Align > Delete > Insert**. This produces
 //! compact alignments that prefer substitutions over gaps.
 //!
 //! # Safety contract

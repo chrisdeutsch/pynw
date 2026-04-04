@@ -81,7 +81,7 @@ mod pynw_native {
     /// Notes
     /// -----
     /// When multiple alignments achieve the same optimal score, ties are
-    /// broken deterministically: ``Diagonal > Up > Left``.  This prefers
+    /// broken deterministically: ``Align > Delete > Insert``.  This prefers
     /// substitutions over gaps, producing compact alignments.  Other tools
     /// may return different co-optimal alignments.
     ///

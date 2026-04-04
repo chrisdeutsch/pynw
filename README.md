@@ -80,7 +80,7 @@ directions; set `insert_penalty` and/or `delete_penalty` to penalise them
 independently.
 
 When multiple alignments achieve the same optimal score, `pynw` breaks ties
-deterministically: `Diagonal > Up > Left`.
+deterministically: `Align > Delete > Insert`.
 
 ### Edit-distance parameterizations
 
