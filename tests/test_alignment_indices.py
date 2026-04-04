@@ -76,3 +76,15 @@ def test_alignment_indices(
     src_idx, tgt_idx = alignment_indices(ops)
     assert src_idx.tolist() == expected_src
     assert tgt_idx.tolist() == expected_tgt
+
+
+def test_raises_on_unknown_op():
+    ops = [EditOp.Align, EditOp.Delete, EditOp.Insert, 99]
+    with pytest.raises(ValueError, match="EditOp"):
+        alignment_indices(ops)
+
+
+@pytest.mark.parametrize("editop", [-1, 999])
+def test_raises_on_overflow(editop):
+    with pytest.raises(OverflowError):
+        alignment_indices([editop])

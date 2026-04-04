@@ -1,7 +1,8 @@
 //! PyO3 binding layer for the `pynw._native` extension module.
 
 use numpy::{
-    Element, IntoPyArray, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray2, get_array_module,
+    Element, IntoPyArray, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2,
+    get_array_module,
 };
 use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
@@ -13,9 +14,9 @@ mod pynw_native {
 
     #[pymodule_init]
     fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        m.add("OP_ALIGN", nw::EditOp::Align as u8)?;
-        m.add("OP_INSERT", nw::EditOp::Insert as u8)?;
-        m.add("OP_DELETE", nw::EditOp::Delete as u8)?;
+        m.add("OP_ALIGN", u8::from(nw::EditOp::Align))?;
+        m.add("OP_INSERT", u8::from(nw::EditOp::Insert))?;
+        m.add("OP_DELETE", u8::from(nw::EditOp::Delete))?;
         Ok(())
     }
 
@@ -98,7 +99,7 @@ mod pynw_native {
         insert_penalty: Option<f64>,
         delete_penalty: Option<f64>,
     ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
-        let py_array = as_pyarray(py, &similarity_matrix)?;
+        let py_array = to_array2_f64(py, &similarity_matrix)?;
         let similarity_matrix = py_array.as_array();
 
         let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
@@ -122,41 +123,94 @@ mod pynw_native {
 
         let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
 
-        let ops: Vec<u8> = ops.into_iter().map(|op| op as u8).collect();
+        let ops: Vec<u8> = ops.into_iter().map(Into::into).collect();
         Ok((score, ops.into_pyarray(py)))
+    }
+
+    type AlignmentIndicesResult<'py> = (
+        Bound<'py, PyArray1<isize>>,
+        Bound<'py, PyArray1<bool>>,
+        Bound<'py, PyArray1<isize>>,
+        Bound<'py, PyArray1<bool>>,
+    );
+
+    #[pyfunction]
+    #[pyo3(signature = (ops), text_signature = "(ops)")]
+    fn alignment_indices<'py>(
+        py: Python<'py>,
+        ops: Bound<'py, PyAny>,
+    ) -> PyResult<AlignmentIndicesResult<'py>> {
+        let py_array = to_array1_u8(py, &ops)?;
+        let u8_view = py_array.as_array();
+
+        let ops: Vec<nw::EditOp> = u8_view
+            .iter()
+            .map(|&b| {
+                nw::EditOp::try_from(b).map_err(|_| {
+                    pyo3::exceptions::PyValueError::new_err("Cannot convert u8 into EditOp")
+                })
+            })
+            .collect::<PyResult<_>>()?;
+
+        let ops_view = numpy::ndarray::ArrayView1::from(ops.as_slice());
+
+        let (source, target) = nw::alignment_indices(ops_view);
+
+        Ok((
+            source.indices.into_pyarray(py),
+            source.mask.into_pyarray(py),
+            target.indices.into_pyarray(py),
+            target.mask.into_pyarray(py),
+        ))
     }
 }
 
-fn as_pyarray<'py>(
+// Modified version of the PyArrayLike extract method. Calls numpy.asarray(obj, dtype=dtype).
+fn numpy_asarray<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
-) -> PyResult<PyReadonlyArray2<'py, f64>> {
-    // This is a modified version of the extract method of PyArrayLike to convert into a 2d f64 array
-
-    if let Ok(array) = obj.cast::<PyArray2<f64>>() {
-        // TODO: Check that array is C-contiguous?
-        return Ok(array.readonly());
-    }
-
+    dtype: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     static AS_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
-
     let as_array = AS_ARRAY
         .get_or_try_init(py, || {
             get_array_module(py)?.getattr("asarray").map(Into::into)
         })?
         .bind(py);
-
     let kwargs = PyDict::new(py);
-    kwargs.set_item(intern!(py, "dtype"), f64::get_dtype(py))?;
+    kwargs.set_item(intern!(py, "dtype"), dtype)?;
+    as_array.call((obj,), Some(&kwargs))
+}
 
-    let array = as_array
-        .call((obj,), Some(kwargs).as_ref())?
+fn to_array2_f64<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<PyReadonlyArray2<'py, f64>> {
+    if let Ok(array) = obj.cast::<PyArray2<f64>>() {
+        // TODO: Check that array is C-contiguous?
+        return Ok(array.readonly());
+    }
+    numpy_asarray(py, obj, f64::get_dtype(py).into_any())?
         .extract()
         .map_err(|_| {
             pyo3::exceptions::PyValueError::new_err(
                 "Cannot convert array-like into 2-dimensional float64 array",
             )
-        })?;
+        })
+}
 
-    Ok(array)
+fn to_array1_u8<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<PyReadonlyArray1<'py, u8>> {
+    if let Ok(array) = obj.cast::<PyArray1<u8>>() {
+        return Ok(array.readonly());
+    }
+    numpy_asarray(py, obj, u8::get_dtype(py).into_any())?
+        .extract()
+        .map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 1-dimensional u8 array",
+            )
+        })
 }

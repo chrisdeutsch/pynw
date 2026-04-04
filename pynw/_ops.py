@@ -6,7 +6,12 @@ from typing import TypeAlias
 import numpy as np
 import numpy.typing as npt
 
-from pynw._native import OP_ALIGN, OP_DELETE, OP_INSERT
+from pynw._native import (
+    OP_ALIGN,
+    OP_DELETE,
+    OP_INSERT,
+)
+from pynw._native import alignment_indices as _alignment_indices
 
 
 class EditOp(IntEnum):
@@ -22,6 +27,29 @@ class EditOp(IntEnum):
 
 
 MaskedIndexArray: TypeAlias = np.ma.MaskedArray[tuple[int], np.dtype[np.intp]]
+
+
+# This is faster for extremely large k (k > 10000). Maybe due to hardware-level
+# vectorization?
+def _alignment_indices_numpy(
+    ops: npt.ArrayLike,
+) -> tuple[MaskedIndexArray, MaskedIndexArray]:
+    ops = np.asarray(ops, dtype=np.uint8)
+
+    insert_mask = ops == EditOp.Insert
+    delete_mask = ops == EditOp.Delete
+
+    source_advances = ~insert_mask
+    target_advances = ~delete_mask
+
+    source_idx = np.ma.array(
+        np.cumsum(source_advances) - source_advances, mask=insert_mask
+    )
+    target_idx = np.ma.array(
+        np.cumsum(target_advances) - target_advances, mask=delete_mask
+    )
+
+    return source_idx, target_idx
 
 
 def alignment_indices(
@@ -47,6 +75,15 @@ def alignment_indices(
         Index into the target sequence at each alignment position.
         Masked (invalid) at delete positions (gap in target).
 
+    Raises
+    ------
+    ValueError
+        If ``ops`` cannot be converted to a 1-D ``uint8`` array, or if any
+        element is not a valid ``EditOp`` discriminant.
+    OverflowError
+        If ``ops`` contains Python integers too large to convert to an 8-bit
+        unsigned integer.
+
     Examples
     --------
     >>> import numpy as np
@@ -64,19 +101,5 @@ def alignment_indices(
     >>> tgt.tolist()
     [0, None, 1]
     """
-    ops = np.asarray(ops, dtype=np.uint8)
-
-    insert_mask = ops == EditOp.Insert
-    delete_mask = ops == EditOp.Delete
-
-    source_advances = ~insert_mask
-    target_advances = ~delete_mask
-
-    source_idx = np.ma.array(
-        np.cumsum(source_advances) - source_advances, mask=insert_mask
-    )
-    target_idx = np.ma.array(
-        np.cumsum(target_advances) - target_advances, mask=delete_mask
-    )
-
-    return source_idx, target_idx
+    src_idx, src_mask, tgt_idx, tgt_mask = _alignment_indices(ops)
+    return np.ma.array(src_idx, mask=src_mask), np.ma.array(tgt_idx, mask=tgt_mask)

@@ -23,14 +23,20 @@
 //! All values in the similarity matrix and gap penalties must be finite.
 //! Non-finite values (`NaN`, `Inf`) cause undefined output.
 
-use numpy::ndarray::{Array2, ArrayView2};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use numpy::ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub(crate) enum EditOp {
     Align = 0,
     Insert = 1,
     Delete = 2,
+}
+
+pub(crate) struct MaskedIndexArray {
+    pub indices: Array1<isize>,
+    pub mask: Array1<bool>,
 }
 
 pub(crate) fn needleman_wunsch(
@@ -47,6 +53,47 @@ pub(crate) fn needleman_wunsch(
     (score, ops)
 }
 
+pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
+    let k = ops.len();
+
+    let mut source = MaskedIndexArray {
+        indices: Array1::zeros(k),
+        mask: Array1::from_elem(k, false),
+    };
+    let mut target = MaskedIndexArray {
+        indices: Array1::zeros(k),
+        mask: Array1::from_elem(k, false),
+    };
+
+    let mut source_index: isize = 0;
+    let mut target_index: isize = 0;
+
+    for (i, &op) in ops.iter().enumerate() {
+        source.indices[i] = source_index;
+        target.indices[i] = target_index;
+
+        match op {
+            EditOp::Align => {
+                // both advance
+                source_index += 1;
+                target_index += 1;
+            }
+            EditOp::Insert => {
+                // gap in source; target advances
+                source.mask[i] = true;
+                target_index += 1;
+            }
+            EditOp::Delete => {
+                // gap in target; source advances
+                target.mask[i] = true;
+                source_index += 1;
+            }
+        }
+    }
+
+    (source, target)
+}
+
 /// Build `(n+1, m+1)` DP score and traceback direction matrices.
 ///
 /// Both matrices are `O(nm)`.  A rolling 2-row band could eliminate `dp`,
@@ -58,7 +105,7 @@ fn fill_matrices(
     delete_penalty: f64,
 ) -> (Array2<f64>, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let mut dp = Array2::<f64>::zeros((n + 1, m + 1));
+    let mut dp = Array2::zeros((n + 1, m + 1));
     let mut tb = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
     // First column: aligning i source-elements against nothing -> i target gaps.
