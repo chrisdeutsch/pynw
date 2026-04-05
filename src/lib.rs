@@ -10,8 +10,6 @@ mod nw;
 
 #[pymodule(name = "_native")]
 mod pynw_native {
-    use num_enum::TryFromPrimitiveError;
-
     use super::*;
 
     #[pymodule_init]
