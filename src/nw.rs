@@ -156,72 +156,9 @@ fn fill_matrices(
     (dp_table, pointers)
 }
 
-/// Traces back through the DP matrix, building masked index arrays directly.
-///
-/// Equivalent to calling [`traceback_ops`] then [`alignment_indices`], but in
-/// a single pass.  At position `(i, j)` in the traceback matrix, `i` and `j`
-/// represent the number of source/target elements consumed so far, so indices
-/// can be recorded without a second traversal.
-pub(crate) fn traceback_indices(
-    pointers: ArrayView2<EditOp>,
-) -> (MaskedIndexArray, MaskedIndexArray) {
-    let (n, m) = (pointers.nrows() - 1, pointers.ncols() - 1);
-
-    let mut source_indices: Vec<isize> = Vec::with_capacity(n + m);
-    let mut source_mask: Vec<bool> = Vec::with_capacity(n + m);
-    let mut target_indices: Vec<isize> = Vec::with_capacity(n + m);
-    let mut target_mask: Vec<bool> = Vec::with_capacity(n + m);
-
-    let mut i = n;
-    let mut j = m;
-
-    while i > 0 || j > 0 {
-        let op = pointers[[i, j]];
-
-        match op {
-            EditOp::Align => {
-                debug_assert!(i > 0 && j > 0, "Diagonal at boundary would underflow");
-                i -= 1;
-                j -= 1;
-                source_indices.push(i as isize);
-                source_mask.push(false);
-                target_indices.push(j as isize);
-                target_mask.push(false);
-            }
-            EditOp::Delete => {
-                debug_assert!(i > 0, "Up at row 0 would underflow");
-                i -= 1;
-                source_indices.push(i as isize);
-                source_mask.push(false);
-                target_indices.push(j as isize);
-                target_mask.push(true);
-            }
-            EditOp::Insert => {
-                debug_assert!(j > 0, "Left at col 0 would underflow");
-                j -= 1;
-                source_indices.push(i as isize);
-                source_mask.push(true);
-                target_indices.push(j as isize);
-                target_mask.push(false);
-            }
-        }
-    }
-
-    source_indices.reverse();
-    source_mask.reverse();
-    target_indices.reverse();
-    target_mask.reverse();
-
-    (
-        MaskedIndexArray {
-            indices: Array1::from_vec(source_indices),
-            mask: Array1::from_vec(source_mask),
-        },
-        MaskedIndexArray {
-            indices: Array1::from_vec(target_indices),
-            mask: Array1::from_vec(target_mask),
-        },
-    )
+fn alignment_score(align_scores: ArrayView2<f64>, insert_penalty: f64, delete_penalty: f64) -> f64 {
+    let (_n, _m) = (align_scores.nrows(), align_scores.ncols());
+    f64::NAN
 }
 
 /// Returns equal-length `(source_idx, target_idx)` (at most `n + m`).
