@@ -181,6 +181,7 @@ dependencies = [
 name = "pynw-native"
 version = "0.3.0"
 dependencies = [
+ "ndarray",
  "num_enum",
  "numpy",
  "pyo3",

@@ -10,6 +10,8 @@ mod nw;
 
 #[pymodule(name = "_native")]
 mod pynw_native {
+    use num_enum::TryFromPrimitiveError;
+
     use super::*;
 
     #[pymodule_init]
@@ -140,21 +142,17 @@ mod pynw_native {
         py: Python<'py>,
         ops: Bound<'py, PyAny>,
     ) -> PyResult<AlignmentIndicesResult<'py>> {
-        let py_array = to_array1_u8(py, &ops)?;
-        let u8_view = py_array.as_array();
-
-        let ops: Vec<nw::EditOp> = u8_view
+        let ops: Vec<nw::EditOp> = to_array1_u8(py, &ops)?
+            .as_slice()?
             .iter()
-            .map(|&b| {
-                nw::EditOp::try_from(b).map_err(|_| {
+            .map(|&x| {
+                nw::EditOp::try_from(x).map_err(|_| {
                     pyo3::exceptions::PyValueError::new_err("Cannot convert u8 into EditOp")
                 })
             })
             .collect::<PyResult<_>>()?;
 
-        let ops_view = numpy::ndarray::ArrayView1::from(ops.as_slice());
-
-        let (source, target) = nw::alignment_indices(ops_view);
+        let (source, target) = nw::alignment_indices((&ops).into());
 
         Ok((
             source.indices.into_pyarray(py),

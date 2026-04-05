@@ -23,8 +23,8 @@
 //! All values in the similarity matrix and gap penalties must be finite.
 //! Non-finite values (`NaN`, `Inf`) cause undefined output.
 
+use ndarray::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use numpy::ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
 #[derive(Clone, Copy, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]

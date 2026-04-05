@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 pyo3 = "0.28.2"
 numpy = "0.28.0"
 num_enum = "0.7.6"
+ndarray = "0.17.2"
 
 [profile.release]
 lto = "fat"
