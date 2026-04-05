@@ -56,9 +56,8 @@ pub(crate) fn needleman_wunsch(
     delete_penalty: f64,
 ) -> (f64, Array1<EditOp>) {
     let (score, traceback) = fill_traceback(align_scores, insert_penalty, delete_penalty);
-    let ops = traceback_ops(traceback.view());
-
-    (score, ops)
+    let editops = traceback_ops(traceback.view());
+    (score, editops)
 }
 
 pub(crate) fn needleman_wunsch_score(
@@ -205,14 +204,14 @@ fn fill_traceback(
 fn traceback_ops(traceback: ArrayView2<EditOp>) -> Array1<EditOp> {
     let (n, m) = (traceback.nrows() - 1, traceback.ncols() - 1);
 
-    let mut ops = Vec::with_capacity(n + m);
+    let mut editops = Vec::with_capacity(n + m);
 
     let mut i = n;
     let mut j = m;
 
     while i > 0 || j > 0 {
         let op = traceback[[i, j]];
-        ops.push(op);
+        editops.push(op);
 
         match op {
             EditOp::Align => {
@@ -231,6 +230,6 @@ fn traceback_ops(traceback: ArrayView2<EditOp>) -> Array1<EditOp> {
         }
     }
 
-    ops.reverse();
-    Array1::from(ops)
+    editops.reverse();
+    Array1::from(editops)
 }

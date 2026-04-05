@@ -6,22 +6,20 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Rust-accelerated [Needleman-Wunsch](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm)
-global sequence alignment for caller-supplied similarity matrices. Python
-bindings are built with [PyO3](https://pyo3.rs).
+global sequence alignment for user-supplied similarity matrices. Python bindings
+are built with [PyO3](https://pyo3.rs).
 
 Align two ordered sequences given any precomputed pairwise similarity matrix.
 Unlike string-distance or bioinformatics libraries, which are designed around
 specific alphabets and scoring rules, `pynw` accepts whatever scores you
-provide: cosine similarity of embeddings, model outputs, distance metrics, or
-exact match. Semantically related tokens (e.g. "cat" and "feline") can align
-with low penalty; tokens with no suitable counterpart are assigned a gap.
+provide: cosine similarity of embeddings, model outputs, or distance metrics.
 
 ## Features
 
 - **Fast:** Alignment runs in $O(nm)$ time; a `1000×1000` matrix takes <10 ms on modern CPUs.
 - **NumPy-first:** Accepts NumPy arrays directly — no intermediate Python objects.
-- **Domain-agnostic:** Operates on a precomputed similarity matrix, so any scoring function (distance metrics, semantic similarity, etc.) works out of the box.
-- **Asymmetric gaps:** Optionally set separate insert and delete penalties.
+- **Domain-agnostic:** Operates on a precomputed similarity matrix, so any scoring function works out of the box.
+- **Asymmetric gaps:** Optionally penalize inserts and deletes separately.
 
 ## Installation
 
@@ -37,9 +35,10 @@ distribution. This requires a [Rust toolchain](https://rustup.rs/) (1.85+).
 
 ## Quick start
 
-Align two token sequences using precomputed cosine similarity from GloVe
-embeddings. Semantically similar words align even without an exact match, and
-words with no good counterpart are gapped out:
+Align two token sequences using precomputed cosine similarity from
+[GloVe](https://nlp.stanford.edu/projects/glove/) embeddings. Semantically
+similar words align even without an exact match, and words with no good
+counterpart are assigned to a gap:
 
 ```python
 import numpy as np
@@ -80,30 +79,7 @@ for h, r in zip(aligned_hyp, aligned_ref):
 #   -          across    <- inserted
 ```
 
-## Details
-
-### Precomputed similarity matrix
-
-`pynw` takes a precomputed `(n, m)` similarity matrix rather than a scoring
-function. This means the entire alignment runs in compiled Rust code with no
-Python callbacks, and you can build scores with vectorized NumPy operations
-rather than element-wise Python loops.
-
-The trade-off is that you must allocate the full matrix up front, which uses
-$O(nm)$ memory even when the scoring rule could be expressed more compactly.
-
-### Scoring
-
-The total alignment score is the sum of similarity-matrix entries for matched
-positions and gap penalties for insertions/deletions. Gap penalties are
-typically negative. By default a single `gap_penalty` applies to both
-directions; set `insert_penalty` and/or `delete_penalty` to penalise them
-independently.
-
-When multiple alignments achieve the same optimal score, `pynw` breaks ties
-deterministically: `Align > Delete > Insert`.
-
-### Usage guide
+## User Guide
 
 Use `needleman_wunsch_score` when you only need the alignment score, for
 example when ranking or filtering many sequence pairs. It skips the traceback
@@ -138,6 +114,29 @@ src_idx, tgt_idx = alignment_indices(ops)
 aligned = ops == EditOp.Align
 substitutions = np.sum(seq1[src_idx.data[aligned]] != seq2[tgt_idx.data[aligned]])
 ```
+
+## Details
+
+### Precomputed similarity matrix
+
+`pynw` takes a precomputed `(n, m)` similarity matrix rather than a scoring
+function. This means the entire alignment runs in compiled Rust code with no
+Python callbacks, and you can build scores with vectorized NumPy operations
+rather than element-wise Python loops.
+
+The trade-off is that you must allocate the full matrix up front, which uses
+$O(nm)$ memory even when the scoring rule could be expressed more compactly.
+
+### Scoring
+
+The total alignment score is the sum of similarity-matrix entries for matched
+positions and gap penalties for insertions/deletions. Gap penalties are
+typically negative. By default a single `gap_penalty` applies to both
+directions; set `insert_penalty` and/or `delete_penalty` to penalise them
+independently.
+
+When multiple alignments achieve the same optimal score, `pynw` breaks ties
+deterministically: `Align > Delete > Insert`.
 
 ### Edit-distance parameterizations
 
