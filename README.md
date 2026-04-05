@@ -92,6 +92,12 @@ for s, t in zip(aligned_src, aligned_tgt):
 
 ## User Guide
 
+`pynw` exposes two alignment functions and a helper for interpreting results.
+Which function you need depends on whether you need just the score or the full
+alignment.
+
+### Score only: `needleman_wunsch_score`
+
 Use `needleman_wunsch_score` when you only need the alignment score, for
 example when ranking or filtering many sequence pairs. It skips the traceback
 entirely, using O(m) memory instead of O(nm):
@@ -99,32 +105,92 @@ entirely, using O(m) memory instead of O(nm):
 ```python
 from pynw import needleman_wunsch_score
 
-score = needleman_wunsch_score(similarity_matrix, gap_penalty=-0.5)
+score = needleman_wunsch_score(similarity_matrix)
 ```
 
-Use `needleman_wunsch` when you need the edit operations. Ops alone are
-sufficient for aggregate counts:
+### Score and alignment: `needleman_wunsch`
+
+Use `needleman_wunsch` when you need to know _how_ the sequences were aligned.
+It returns the optimal score along with an array of edit operations (`editops`).
+Each element in the ops array is one of three `EditOp` values:
+
+- `EditOp.Align`: a source element is matched with a target element.
+- `EditOp.Delete`: a source element is consumed with no matching target element
+  (gap in target).
+- `EditOp.Insert`: a target element is consumed with no matching source element
+  (gap in source).
+
+The ops array alone is enough for aggregate statistics:
 
 ```python
 from pynw import EditOp, needleman_wunsch
 
-score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
+score, editops = needleman_wunsch(similarity_matrix)
 
-n_aligned = np.sum(ops == EditOp.Align)
-n_inserted = np.sum(ops == EditOp.Insert)
-n_deleted = np.sum(ops == EditOp.Delete)
+n_aligned = np.sum(editops == EditOp.Align)
+n_inserted = np.sum(editops == EditOp.Insert)
+n_deleted = np.sum(editops == EditOp.Delete)
 ```
 
-Use `alignment_indices` when you need to compare the aligned elements
-themselves, for example to count substitutions among aligned positions:
+### Reconstructing the alignment: `alignment_indices`
+
+Use `alignment_indices` when you need to map alignment positions back to the
+original sequences. It converts the ops array into two masked index arrays: one
+for the source, one for the target. Each array has one entry per alignment
+position. Positions where the corresponding sequence has a gap are masked.
 
 ```python
 from pynw import alignment_indices
 
-src_idx, tgt_idx = alignment_indices(ops)
-aligned = ops == EditOp.Align
-substitutions = np.sum(seq1[src_idx.data[aligned]] != seq2[tgt_idx.data[aligned]])
+src_idx, tgt_idx = alignment_indices(editops)
 ```
+
+Because the indices are masked arrays, `take` propagates the mask and `filled`
+substitutes a value at gap positions. This makes it easy to reconstruct aligned
+sequences with gap markers:
+
+```python
+source = np.ma.array(["the", "quick", "fox"])
+target = np.ma.array(["the", "slow", "red", "fox"])
+
+aligned_src = source.take(src_idx).filled("-")
+aligned_tgt = target.take(tgt_idx).filled("-")
+# aligned_src: ['the', 'quick', '-',   'fox']
+# aligned_tgt: ['the', 'slow',  'red', 'fox']
+```
+
+When iterating over a masked array, masked positions yield the `np.ma.masked`
+sentinel instead of an integer. This means you can iterate over `editops` and the
+index arrays together without checking masks explicitly. In the diff example
+below, `s` is masked at Insert positions and `t` is masked at Delete positions,
+so only the valid index is used in each branch:
+
+```python
+for op, s, t in zip(ops, src_idx, tgt_idx):
+    if op == EditOp.Align:
+        print(f"  {source[s]}")
+    elif op == EditOp.Delete:
+        print(f"- {source[s]}")
+    elif op == EditOp.Insert:
+        print(f"+ {target[t]}")
+```
+
+### Asymmetric gap penalties
+
+By default, `gap_penalty` applies equally to insertions and deletions. To
+penalize them independently, pass `insert_penalty` and/or `delete_penalty`:
+
+```python
+score, ops = needleman_wunsch(
+    similarity_matrix,
+    insert_penalty=-0.3,
+    delete_penalty=-0.7,
+)
+```
+
+When set, these override `gap_penalty` for the corresponding direction. This is
+useful when the cost of missing a source element differs from the cost of
+introducing a spurious target element.
 
 ## Details
 

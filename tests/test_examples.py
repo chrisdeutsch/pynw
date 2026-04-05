@@ -40,9 +40,8 @@ Score: 1.42
 
 
 def test_quickstart_example(repo_root, capsys):
-    ((block, start_line),) = _extract_python_blocks(
-        (repo_root / "README.md").read_text()
-    )
+    blocks = _extract_python_blocks((repo_root / "README.md").read_text())
+    block, start_line = blocks[0]
     _exec_block(block, "README.md", start_line)
     assert capsys.readouterr().out == QUICKSTART_EXPECTED_OUTPUT
 
