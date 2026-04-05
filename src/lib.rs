@@ -142,8 +142,8 @@ mod pynw_native {
     ) -> PyResult<AlignmentIndicesResult<'py>> {
         let pyarray = to_array1_u8(py, &ops)?;
 
-        let ops = nw::as_editops(pyarray.as_array())
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+        let ops =
+            nw::as_editops(pyarray.as_array()).map_err(pyo3::exceptions::PyValueError::new_err)?;
 
         let (source, target) = nw::alignment_indices(ops);
 
