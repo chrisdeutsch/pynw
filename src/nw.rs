@@ -38,11 +38,11 @@ pub fn parse_editops<D: Dimension>(
     array: ArrayView<u8, D>,
 ) -> Result<Array<EditOp, D>, &'static str> {
     let dim = array.dim();
-    let ops: Vec<EditOp> = array
+    let editops: Vec<EditOp> = array
         .iter()
         .map(|&x| EditOp::try_from(x).map_err(|_| "Cannot convert u8 into EditOp"))
         .collect::<Result<_, _>>()?;
-    Array::from_shape_vec(dim, ops).map_err(|_| "Shape error")
+    Array::from_shape_vec(dim, editops).map_err(|_| "Shape error")
 }
 
 pub(crate) struct MaskedIndexArray {
@@ -56,7 +56,7 @@ pub(crate) fn needleman_wunsch(
     delete_penalty: f64,
 ) -> (f64, Array1<EditOp>) {
     let (score, traceback) = fill_traceback(align_scores, insert_penalty, delete_penalty);
-    let editops = traceback_ops(traceback.view());
+    let editops = traceback_editops(traceback.view());
     (score, editops)
 }
 
@@ -101,8 +101,10 @@ pub(crate) fn needleman_wunsch_score(
     prev_row[m]
 }
 
-pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
-    let k = ops.len();
+pub(crate) fn alignment_indices(
+    editops: ArrayView1<EditOp>,
+) -> (MaskedIndexArray, MaskedIndexArray) {
+    let k = editops.len();
 
     let mut source = MaskedIndexArray {
         indices: Array1::zeros(k),
@@ -116,7 +118,7 @@ pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, M
     let mut source_index: isize = 0;
     let mut target_index: isize = 0;
 
-    for (i, &op) in ops.iter().enumerate() {
+    for (i, &op) in editops.iter().enumerate() {
         source.indices[i] = source_index;
         target.indices[i] = target_index;
 
@@ -201,7 +203,7 @@ fn fill_traceback(
 /// Debug-asserts that the traceback never underflows.  This invariant is
 /// guaranteed by the boundary initialisation in [`fill_traceback`]:
 /// column 0 is always `Up` and row 0 is always `Left`.
-fn traceback_ops(traceback: ArrayView2<EditOp>) -> Array1<EditOp> {
+fn traceback_editops(traceback: ArrayView2<EditOp>) -> Array1<EditOp> {
     let (n, m) = (traceback.nrows() - 1, traceback.ncols() - 1);
 
     let mut editops = Vec::with_capacity(n + m);

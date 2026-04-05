@@ -53,7 +53,7 @@ mod pynw_native {
     /// -------
     /// score : float
     ///     The optimal alignment score.
-    /// ops : ndarray of uint8, shape (k,)
+    /// editops : ndarray of uint8, shape (k,)
     ///     Sequence of edit operations describing the alignment.  Each element
     ///     is of type ``EditOp``.  Use
     ///     ``alignment_indices`` to reconstruct source and target index arrays.
@@ -67,10 +67,10 @@ mod pynw_native {
     /// >>> seq1 = np.array(list("GATTACA"))
     /// >>> seq2 = np.array(list("GCATGCA"))
     /// >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
-    /// >>> score, ops = needleman_wunsch(sm, gap_penalty=-1.0)
+    /// >>> score, editops = needleman_wunsch(sm, gap_penalty=-1.0)
     /// >>> score
     /// 2.0
-    /// >>> src_idx, tgt_idx = alignment_indices(ops)
+    /// >>> src_idx, tgt_idx = alignment_indices(editops)
     /// >>> "".join(np.ma.array(seq1).take(src_idx).filled("-"))
     /// 'G-ATTACA'
     /// >>> "".join(np.ma.array(seq2).take(tgt_idx).filled("-"))
@@ -109,8 +109,9 @@ mod pynw_native {
 
         validate_inputs(similarity_matrix, insert_penalty, delete_penalty)?;
 
-        let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
-        Ok((score, ops.mapv(Into::into).into_pyarray(py)))
+        let (score, editops) =
+            nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
+        Ok((score, editops.mapv(Into::into).into_pyarray(py)))
     }
 
     // NOTE: This doc comment provides the runtime `help()` docstring.
@@ -204,20 +205,20 @@ mod pynw_native {
     );
 
     #[pyfunction]
-    #[pyo3(signature = (ops), text_signature = "(ops)")]
+    #[pyo3(signature = (editops), text_signature = "(editops)")]
     fn alignment_indices<'py>(
         py: Python<'py>,
-        ops: Bound<'py, PyAny>,
+        editops: Bound<'py, PyAny>,
     ) -> PyResult<AlignmentIndicesResult<'py>> {
-        let pyarray = to_pyreadonly(py, ops).map_err(|_| {
+        let pyarray = to_pyreadonly(py, editops).map_err(|_| {
             pyo3::exceptions::PyValueError::new_err(
                 "Cannot convert array-like into 1-dimensional u8 array",
             )
         })?;
-        let ops = nw::parse_editops(pyarray.as_array())
+        let editops = nw::parse_editops(pyarray.as_array())
             .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
-        let (source, target) = nw::alignment_indices(ops.view());
+        let (source, target) = nw::alignment_indices(editops.view());
 
         Ok((
             source.indices.into_pyarray(py),

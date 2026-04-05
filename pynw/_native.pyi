@@ -48,7 +48,7 @@ def needleman_wunsch(
     -------
     score : float
         The optimal alignment score.
-    ops : ndarray of uint8, shape (k,)
+    editops : ndarray of uint8, shape (k,)
         Sequence of edit operations describing the alignment.  Each element
         is of type ``EditOp``.  Use
         ``alignment_indices`` to reconstruct source and target index arrays.
@@ -62,10 +62,10 @@ def needleman_wunsch(
     >>> seq1 = np.array(list("GATTACA"))
     >>> seq2 = np.array(list("GCATGCA"))
     >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
-    >>> score, ops = needleman_wunsch(sm, gap_penalty=-1.0)
+    >>> score, editops = needleman_wunsch(sm, gap_penalty=-1.0)
     >>> score
     2.0
-    >>> src_idx, tgt_idx = alignment_indices(ops)
+    >>> src_idx, tgt_idx = alignment_indices(editops)
     >>> "".join(np.ma.array(seq1).take(src_idx).filled("-"))
     'G-ATTACA'
     >>> "".join(np.ma.array(seq2).take(tgt_idx).filled("-"))
@@ -140,7 +140,7 @@ def needleman_wunsch_score(
     ...
 
 def alignment_indices(
-    ops: npt.ArrayLike,
+    editops: npt.ArrayLike,
 ) -> tuple[
     npt.NDArray[np.intp],
     npt.NDArray[np.bool_],

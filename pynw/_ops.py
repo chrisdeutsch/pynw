@@ -32,12 +32,12 @@ MaskedIndexArray: TypeAlias = np.ma.MaskedArray[tuple[int], np.dtype[np.intp]]
 # This is faster for extremely large k (k > 10000). Maybe due to hardware-level
 # vectorization?
 def _alignment_indices_numpy(
-    ops: npt.ArrayLike,
+    editops: npt.ArrayLike,
 ) -> tuple[MaskedIndexArray, MaskedIndexArray]:
-    ops = np.asarray(ops, dtype=np.uint8)
+    editops = np.asarray(editops, dtype=np.uint8)
 
-    insert_mask = ops == EditOp.Insert
-    delete_mask = ops == EditOp.Delete
+    insert_mask = editops == EditOp.Insert
+    delete_mask = editops == EditOp.Delete
 
     source_advances = ~insert_mask
     target_advances = ~delete_mask
@@ -53,9 +53,9 @@ def _alignment_indices_numpy(
 
 
 def alignment_indices(
-    ops: npt.ArrayLike,
+    editops: npt.ArrayLike,
 ) -> tuple[MaskedIndexArray, MaskedIndexArray]:
-    """Reconstruct source and target indices from an ops array.
+    """Reconstruct source and target indices from an editops array.
 
     Converts a sequence of edit operations into a pair of masked index arrays.
     Each array has one entry per alignment position.  Positions where the
@@ -63,7 +63,7 @@ def alignment_indices(
 
     Parameters
     ----------
-    ops : array_like of uint8, shape (k,)
+    editops : array_like of uint8, shape (k,)
         Edit-operation sequence returned by ``needleman_wunsch``.
 
     Returns
@@ -78,7 +78,7 @@ def alignment_indices(
     Raises
     ------
     ValueError
-        If ``ops`` cannot be converted to a 1-D ``uint8`` array, if any
+        If ``editops`` cannot be converted to a 1-D ``uint8`` array, if any
         element is out of the ``uint8`` range, or if any element is not a
         valid ``EditOp`` discriminant.
 
@@ -92,12 +92,12 @@ def alignment_indices(
     ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :],
     ...     1.0, -1.0,
     ... )
-    >>> _, ops = needleman_wunsch(sm, gap_penalty=-1.0)
-    >>> src, tgt = alignment_indices(ops)
+    >>> _, editops = needleman_wunsch(sm, gap_penalty=-1.0)
+    >>> src, tgt = alignment_indices(editops)
     >>> src.tolist()
     [0, 1, 2]
     >>> tgt.tolist()
     [0, None, 1]
     """
-    src_idx, src_mask, tgt_idx, tgt_mask = _alignment_indices(ops)
+    src_idx, src_mask, tgt_idx, tgt_mask = _alignment_indices(editops)
     return np.ma.array(src_idx, mask=src_mask), np.ma.array(tgt_idx, mask=tgt_mask)

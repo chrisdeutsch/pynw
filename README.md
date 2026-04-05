@@ -71,8 +71,8 @@ similarity_matrix = np.array([
 
 # Each gap deducts 0.5 from the total score; increase the penalty to force
 # more alignments, decrease it to allow more gaps
-score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
-src_idx, tgt_idx = alignment_indices(ops)
+score, editops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
+src_idx, tgt_idx = alignment_indices(editops)
 
 # Reconstruct aligned sequences; masked positions are gaps
 aligned_src = np.ma.array(source).take(src_idx).filled("-")
@@ -112,7 +112,7 @@ score = needleman_wunsch_score(similarity_matrix)
 
 Use `needleman_wunsch` when you need to know _how_ the sequences were aligned.
 It returns the optimal score along with an array of edit operations (`editops`).
-Each element in the ops array is one of three `EditOp` values:
+Each element in the editops array is one of three `EditOp` values:
 
 - `EditOp.Align`: a source element is matched with a target element.
 - `EditOp.Delete`: a source element is consumed with no matching target element
@@ -120,7 +120,7 @@ Each element in the ops array is one of three `EditOp` values:
 - `EditOp.Insert`: a target element is consumed with no matching source element
   (gap in source).
 
-The ops array alone is enough for aggregate statistics:
+The editops array alone is enough for aggregate statistics:
 
 ```python
 from pynw import EditOp, needleman_wunsch
@@ -135,7 +135,7 @@ n_deleted = np.sum(editops == EditOp.Delete)
 ### Reconstructing the alignment: `alignment_indices`
 
 Use `alignment_indices` when you need to map alignment positions back to the
-original sequences. It converts the ops array into two masked index arrays: one
+original sequences. It converts the editops array into two masked index arrays: one
 for the source, one for the target. Each array has one entry per alignment
 position. Positions where the corresponding sequence has a gap are masked.
 
@@ -166,7 +166,7 @@ below, `s` is masked at Insert positions and `t` is masked at Delete positions,
 so only the valid index is used in each branch:
 
 ```python
-for op, s, t in zip(ops, src_idx, tgt_idx):
+for op, s, t in zip(editops, src_idx, tgt_idx):
     if op == EditOp.Align:
         print(f"  {source[s]}")
     elif op == EditOp.Delete:
@@ -181,7 +181,7 @@ By default, `gap_penalty` applies equally to insertions and deletions. To
 penalize them independently, pass `insert_penalty` and/or `delete_penalty`:
 
 ```python
-score, ops = needleman_wunsch(
+score, editops = needleman_wunsch(
     similarity_matrix,
     insert_penalty=-0.3,
     delete_penalty=-0.7,
