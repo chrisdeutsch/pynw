@@ -68,19 +68,19 @@ pub(crate) fn needleman_wunsch_score(
 ) -> f64 {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
 
-    let mut dp = Array2::<f64>::zeros((2, m + 1));
-    for col in 0..=m {
-        dp[[0, col]] = col as f64 * insert_penalty;
+    let mut prev_row = Array1::<f64>::zeros(m + 1);
+    let mut curr_row = Array1::<f64>::zeros(m + 1);
+    for col in 1..=m {
+        prev_row[col] = col as f64 * insert_penalty;
     }
 
     for row in 1..=n {
-        let (prev, curr) = ((row - 1) % 2, row % 2);
-        dp[[curr, 0]] = dp[[prev, 0]] + delete_penalty;
+        curr_row[0] = prev_row[0] + delete_penalty;
 
         for col in 1..=m {
-            let align = dp[[prev, col - 1]] + align_scores[[row - 1, col - 1]];
-            let delete = dp[[prev, col]] + delete_penalty;
-            let insert = dp[[curr, col - 1]] + insert_penalty;
+            let align = prev_row[col - 1] + align_scores[[row - 1, col - 1]];
+            let delete = prev_row[col] + delete_penalty;
+            let insert = curr_row[col - 1] + insert_penalty;
 
             // Sequential max rather than a three-way if/else chain.
             //
@@ -104,11 +104,13 @@ pub(crate) fn needleman_wunsch_score(
             if insert > score {
                 score = insert;
             }
-            dp[[curr, col]] = score;
+            curr_row[col] = score;
         }
+
+        std::mem::swap(&mut prev_row, &mut curr_row);
     }
 
-    dp[[n % 2, m]]
+    prev_row[m]
 }
 
 pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
@@ -152,11 +154,12 @@ pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, M
     (source, target)
 }
 
-/// Build `(n+1, m+1)` DP score and traceback direction matrices.
+/// Build the traceback direction matrix and return the final score.
 ///
-/// Both matrices are `O(nm)`.  A rolling 2-row band could eliminate `dp`,
-/// but the `tb` matrix is still `O(nm)`.  True linear-space traceback
-/// requires Hirschberg's divide-and-conquer algorithm.
+/// The DP score table is reduced to a rolling 2-row buffer (`O(m)` space).
+/// The pointers matrix must remain `O(nm)` because traceback reads it
+/// back-to-front after the fill.  True linear-space traceback would require
+/// Hirschberg's divide-and-conquer algorithm.
 fn fill_matrices(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
@@ -164,27 +167,30 @@ fn fill_matrices(
 ) -> (f64, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
 
-    let mut dp_table = Array2::zeros((n + 1, m + 1));
+    // Rolling 2-row buffer: only the previous and current rows are needed to
+    // compute the next row's scores.  Two separate arrays let us bind named
+    // references to each row; std::mem::swap rotates them in O(1) at the end
+    // of each iteration without copying any data.
+    let mut prev_row = Array1::<f64>::zeros(m + 1);
+    let mut curr_row = Array1::<f64>::zeros(m + 1);
     // Each cell stores the editop that produced its score, i.e. a pointer back
     // to the predecessor cell.
     let mut pointers = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
-    // First column: aligning i source-elements against nothing -> i target gaps.
-    for i in 1..=n {
-        dp_table[[i, 0]] = i as f64 * delete_penalty;
-        pointers[[i, 0]] = EditOp::Delete;
-    }
     // First row: aligning j target-elements against nothing -> j source gaps.
     for j in 1..=m {
-        dp_table[[0, j]] = j as f64 * insert_penalty;
+        prev_row[j] = j as f64 * insert_penalty;
         pointers[[0, j]] = EditOp::Insert;
     }
 
     for i in 1..=n {
+        curr_row[0] = prev_row[0] + delete_penalty;
+        pointers[[i, 0]] = EditOp::Delete;
+
         for j in 1..=m {
-            let align = dp_table[[i - 1, j - 1]] + align_scores[[i - 1, j - 1]];
-            let delete = dp_table[[i - 1, j]] + delete_penalty;
-            let insert = dp_table[[i, j - 1]] + insert_penalty;
+            let align = prev_row[j - 1] + align_scores[[i - 1, j - 1]];
+            let delete = prev_row[j] + delete_penalty;
+            let insert = curr_row[j - 1] + insert_penalty;
 
             // Tie-breaking: align > delete > insert
             let (score, op) = if insert > delete && insert > align {
@@ -195,12 +201,14 @@ fn fill_matrices(
                 (align, EditOp::Align)
             };
 
-            dp_table[[i, j]] = score;
+            curr_row[j] = score;
             pointers[[i, j]] = op;
         }
+
+        std::mem::swap(&mut prev_row, &mut curr_row);
     }
 
-    (dp_table[[n, m]], pointers)
+    (prev_row[m], pointers)
 }
 
 /// Returns equal-length `(source_idx, target_idx)` (at most `n + m`).
