@@ -82,21 +82,10 @@ pub(crate) fn needleman_wunsch_score(
             let delete = prev_row[col] + delete_penalty;
             let insert = curr_row[col - 1] + insert_penalty;
 
-            // Sequential max rather than a three-way if/else chain.
-            //
-            // When this function only produces a float (no EditOp alongside it),
-            // LLVM turns a three-way if/else into a branchless bitwise-select
-            // sequence (~13 SSE instructions: cmpltsd, andpd, andnpd, orpd, …).
-            // By contrast, fill_traceback computes an integer EditOp in the same
-            // branch, which forces LLVM to use two conditional jumps (~8
-            // instructions) — fast in practice because the CPU's branch predictor
-            // handles accumulated DP values well.
-            //
-            // The sequential-max formulation compiles to two `maxsd` instructions,
-            // beating both alternatives.  It also preserves the Align > Delete >
-            // Insert tie-breaking: `maxsd dst, src` returns `src` on equality, so
-            // the earlier winner (align, then delete) survives a tie with a later
-            // candidate (delete, then insert).
+            // Two sequential comparisons compile to two `maxsd` instructions,
+            // faster than a three-way if/else (branchless bitwise-select, ~13
+            // SSE instructions). Tie-breaking is preserved: `maxsd dst, src`
+            // returns `src` on equality, so align beats delete beats insert.
             let mut score = align;
             if delete > score {
                 score = delete;
