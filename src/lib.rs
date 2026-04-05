@@ -126,9 +126,7 @@ mod pynw_native {
         }
 
         let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
-
-        let ops: Vec<u8> = ops.into_iter().map(Into::into).collect();
-        Ok((score, ops.into_pyarray(py)))
+        Ok((score, ops.mapv(Into::into).into_pyarray(py)))
     }
 
     type AlignmentIndicesResult<'py> = (

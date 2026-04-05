@@ -54,7 +54,7 @@ pub(crate) fn needleman_wunsch(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
-) -> (f64, Vec<EditOp>) {
+) -> (f64, Array1<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
     let (dp, tb) = fill_matrices(align_scores, insert_penalty, delete_penalty);
     let ops = traceback_ops(tb.view());
@@ -116,25 +116,28 @@ fn fill_matrices(
     delete_penalty: f64,
 ) -> (Array2<f64>, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let mut dp = Array2::zeros((n + 1, m + 1));
-    let mut tb = Array2::from_elem((n + 1, m + 1), EditOp::Align);
+
+    let mut dp_table = Array2::zeros((n + 1, m + 1));
+    // Each cell stores the editop that produced its score, i.e. a pointer back
+    // to the predecessor cell.
+    let mut pointers = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
     // First column: aligning i source-elements against nothing -> i target gaps.
     for i in 1..=n {
-        dp[[i, 0]] = i as f64 * delete_penalty;
-        tb[[i, 0]] = EditOp::Delete;
+        dp_table[[i, 0]] = i as f64 * delete_penalty;
+        pointers[[i, 0]] = EditOp::Delete;
     }
     // First row: aligning j target-elements against nothing -> j source gaps.
     for j in 1..=m {
-        dp[[0, j]] = j as f64 * insert_penalty;
-        tb[[0, j]] = EditOp::Insert;
+        dp_table[[0, j]] = j as f64 * insert_penalty;
+        pointers[[0, j]] = EditOp::Insert;
     }
 
     for i in 1..=n {
         for j in 1..=m {
-            let align = dp[[i - 1, j - 1]] + align_scores[[i - 1, j - 1]];
-            let delete = dp[[i - 1, j]] + delete_penalty;
-            let insert = dp[[i, j - 1]] + insert_penalty;
+            let align = dp_table[[i - 1, j - 1]] + align_scores[[i - 1, j - 1]];
+            let delete = dp_table[[i - 1, j]] + delete_penalty;
+            let insert = dp_table[[i, j - 1]] + insert_penalty;
 
             // Tie-breaking: align > delete > insert
             let (score, op) = if insert > delete && insert > align {
@@ -145,12 +148,80 @@ fn fill_matrices(
                 (align, EditOp::Align)
             };
 
-            dp[[i, j]] = score;
-            tb[[i, j]] = op;
+            dp_table[[i, j]] = score;
+            pointers[[i, j]] = op;
         }
     }
 
-    (dp, tb)
+    (dp_table, pointers)
+}
+
+/// Traces back through the DP matrix, building masked index arrays directly.
+///
+/// Equivalent to calling [`traceback_ops`] then [`alignment_indices`], but in
+/// a single pass.  At position `(i, j)` in the traceback matrix, `i` and `j`
+/// represent the number of source/target elements consumed so far, so indices
+/// can be recorded without a second traversal.
+pub(crate) fn traceback_indices(
+    pointers: ArrayView2<EditOp>,
+) -> (MaskedIndexArray, MaskedIndexArray) {
+    let (n, m) = (pointers.nrows() - 1, pointers.ncols() - 1);
+
+    let mut source_indices: Vec<isize> = Vec::with_capacity(n + m);
+    let mut source_mask: Vec<bool> = Vec::with_capacity(n + m);
+    let mut target_indices: Vec<isize> = Vec::with_capacity(n + m);
+    let mut target_mask: Vec<bool> = Vec::with_capacity(n + m);
+
+    let mut i = n;
+    let mut j = m;
+
+    while i > 0 || j > 0 {
+        let op = pointers[[i, j]];
+
+        match op {
+            EditOp::Align => {
+                debug_assert!(i > 0 && j > 0, "Diagonal at boundary would underflow");
+                i -= 1;
+                j -= 1;
+                source_indices.push(i as isize);
+                source_mask.push(false);
+                target_indices.push(j as isize);
+                target_mask.push(false);
+            }
+            EditOp::Delete => {
+                debug_assert!(i > 0, "Up at row 0 would underflow");
+                i -= 1;
+                source_indices.push(i as isize);
+                source_mask.push(false);
+                target_indices.push(j as isize);
+                target_mask.push(true);
+            }
+            EditOp::Insert => {
+                debug_assert!(j > 0, "Left at col 0 would underflow");
+                j -= 1;
+                source_indices.push(i as isize);
+                source_mask.push(true);
+                target_indices.push(j as isize);
+                target_mask.push(false);
+            }
+        }
+    }
+
+    source_indices.reverse();
+    source_mask.reverse();
+    target_indices.reverse();
+    target_mask.reverse();
+
+    (
+        MaskedIndexArray {
+            indices: Array1::from_vec(source_indices),
+            mask: Array1::from_vec(source_mask),
+        },
+        MaskedIndexArray {
+            indices: Array1::from_vec(target_indices),
+            mask: Array1::from_vec(target_mask),
+        },
+    )
 }
 
 /// Returns equal-length `(source_idx, target_idx)` (at most `n + m`).
@@ -158,8 +229,8 @@ fn fill_matrices(
 /// Debug-asserts that the traceback never underflows.  This invariant is
 /// guaranteed by the boundary initialisation in [`fill_matrices`]:
 /// column 0 is always `Up` and row 0 is always `Left`.
-fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
-    let (n, m) = (traceback_matrix.nrows() - 1, traceback_matrix.ncols() - 1);
+fn traceback_ops(pointers: ArrayView2<EditOp>) -> Array1<EditOp> {
+    let (n, m) = (pointers.nrows() - 1, pointers.ncols() - 1);
 
     let mut ops = Vec::with_capacity(n + m);
 
@@ -167,7 +238,7 @@ fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
     let mut j = m;
 
     while i > 0 || j > 0 {
-        let op = traceback_matrix[[i, j]];
+        let op = pointers[[i, j]];
         ops.push(op);
 
         match op {
@@ -188,5 +259,5 @@ fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
     }
 
     ops.reverse();
-    ops
+    Array1::from(ops)
 }
