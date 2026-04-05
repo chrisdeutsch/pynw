@@ -89,8 +89,53 @@ def needleman_wunsch_score(
     insert_penalty: float | None = None,
     delete_penalty: float | None = None,
 ) -> float:
-    """
-    TODO
+    """Compute the optimal Needleman-Wunsch alignment score without the traceback.
+
+    Returns the same score as ``needleman_wunsch`` but uses O(m) memory instead
+    of O(n*m) by retaining only two rows of the DP table at a time. The runtime
+    difference between the two is minor. Use this function when you need the
+    score but not the alignment itself.
+
+    Parameters
+    ----------
+    similarity_matrix : array_like, shape (n, m)
+        ``similarity_matrix[i, j]`` is the similarity score for aligning
+        element *i* of the source sequence with element *j* of the target
+        sequence.
+    gap_penalty : float, default -1.0
+        Penalty applied when a gap is inserted in either sequence.
+        Use ``insert_penalty`` or ``delete_penalty`` to set them
+        independently.
+    insert_penalty : float, optional
+        Penalty for advancing the target sequence without consuming a source
+        element (gap in source).  Defaults to ``gap_penalty``.
+    delete_penalty : float, optional
+        Penalty for advancing the source sequence without consuming a target
+        element (gap in target).  Defaults to ``gap_penalty``.
+
+    Raises
+    ------
+    ValueError
+        If ``similarity_matrix`` is not 2-dimensional, or if any value in
+        ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
+
+    Returns
+    -------
+    score : float
+        The optimal alignment score.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> seq1 = np.array(list("GATTACA"))
+    >>> seq2 = np.array(list("GCATGCA"))
+    >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
+    >>> needleman_wunsch_score(sm, gap_penalty=-1.0)
+    2.0
+
+    Notes
+    -----
+    All values in ``similarity_matrix`` and the gap penalties must be finite.
     """
     ...
 
