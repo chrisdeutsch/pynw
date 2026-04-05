@@ -30,9 +30,12 @@ def _exec_block(block: str, name: str, line_offset: int = 0) -> dict[str, Any]:
 
 
 QUICKSTART_EXPECTED_OUTPUT = snapshot("""\
-Score: 2.0
-G-ATTACA
-GCA-TGCA
+Score: 1.42
+  clever      sly
+  sneaky      -
+  fox         fox
+  leaped      jumped
+  -           across
 """)
 
 

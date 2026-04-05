@@ -6,12 +6,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Rust-accelerated [Needleman-Wunsch](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm)
-global sequence alignment for precomputed similarity matrices. Python
+global sequence alignment for caller-supplied similarity matrices. Python
 bindings are built with [PyO3](https://pyo3.rs).
 
-Align two ordered sequences, allowing for gaps (insertions/deletions), given any
-precomputed pairwise similarity matrix. Useful for strings, time series, token
-sequences, or any domain where element order matters.
+Align two ordered sequences given any precomputed pairwise similarity matrix.
+Unlike string-distance or bioinformatics libraries, which are designed around
+specific alphabets and scoring rules, `pynw` accepts whatever scores you
+provide: cosine similarity of embeddings, model outputs, distance metrics, or
+exact match. Semantically related tokens (e.g. "cat" and "feline") can align
+with low penalty; tokens with no suitable counterpart are assigned a gap.
 
 ## Features
 
@@ -34,29 +37,47 @@ distribution. This requires a [Rust toolchain](https://rustup.rs/) (1.85+).
 
 ## Quick start
 
-Align two DNA sequences using a simple match/mismatch scoring scheme:
+Align two token sequences using precomputed cosine similarity from GloVe
+embeddings. Semantically similar words align even without an exact match, and
+words with no good counterpart are gapped out:
 
 ```python
 import numpy as np
 from pynw import needleman_wunsch, alignment_indices
 
-seq1 = np.array(list("GATTACA"))
-seq2 = np.array(list("GCATGCA"))
+hypothesis = np.array(
+    ["clever", "sneaky", "fox", "leaped"]
+)
+reference = np.array(
+    ["sly", "fox", "jumped", "across"]
+)
 
-# Build an (n, m) similarity matrix: +1 for match, -1 for mismatch
-similarity_matrix = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
+# Cosine similarity from GloVe (glove-wiki-gigaword-50)
+similarity_matrix = np.array([
+    # sly     fox     jumped  across
+    [ 0.65,   0.25,   0.06,   0.20],  # clever
+    [ 0.57,   0.06,  -0.14,  -0.05],  # sneaky
+    [ 0.26,   1.00,   0.30,   0.41],  # fox
+    [-0.00,   0.07,   0.77,   0.35],  # leaped
+])
 
-score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
+# gap_penalty=-0.5 means: prefer a gap over aligning tokens with cosine similarity < 0.5
+score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
 src_idx, tgt_idx = alignment_indices(ops)
 
 # Reconstruct aligned sequences; masked positions are gaps
-aligned1 = np.ma.array(seq1).take(src_idx).filled("-")
-aligned2 = np.ma.array(seq2).take(tgt_idx).filled("-")
+aligned_hyp = np.ma.array(hypothesis).take(src_idx).filled("-")
+aligned_ref = np.ma.array(reference).take(tgt_idx).filled("-")
 
-print(f"Score: {score}\n{''.join(aligned1)}\n{''.join(aligned2)}")
-# Score: 2.0
-# G-ATTACA
-# GCA-TGCA
+print(f"Score: {round(score, 2)}")
+for h, r in zip(aligned_hyp, aligned_ref):
+    print(f"  {h:10s}  {r}")
+# Score: 1.42
+#   clever     sly       <- semantic match
+#   sneaky     -         <- deleted
+#   fox        fox       <- exact match
+#   leaped     jumped    <- semantic match
+#   -          across    <- inserted
 ```
 
 ## Details
@@ -81,6 +102,42 @@ independently.
 
 When multiple alignments achieve the same optimal score, `pynw` breaks ties
 deterministically: `Align > Delete > Insert`.
+
+### Usage guide
+
+Use `needleman_wunsch_score` when you only need the alignment score, for
+example when ranking or filtering many sequence pairs. It skips the traceback
+entirely, using O(m) memory instead of O(nm):
+
+```python
+from pynw import needleman_wunsch_score
+
+score = needleman_wunsch_score(similarity_matrix, gap_penalty=-0.5)
+```
+
+Use `needleman_wunsch` when you need the edit operations. Ops alone are
+sufficient for aggregate counts:
+
+```python
+from pynw import EditOp, needleman_wunsch
+
+score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
+
+n_aligned = np.sum(ops == EditOp.Align)
+n_inserted = np.sum(ops == EditOp.Insert)
+n_deleted = np.sum(ops == EditOp.Delete)
+```
+
+Use `alignment_indices` when you need to compare the aligned elements
+themselves, for example to count substitutions among aligned positions:
+
+```python
+from pynw import alignment_indices
+
+src_idx, tgt_idx = alignment_indices(ops)
+aligned = ops == EditOp.Align
+substitutions = np.sum(seq1[src_idx.data[aligned]] != seq2[tgt_idx.data[aligned]])
+```
 
 ### Edit-distance parameterizations
 
