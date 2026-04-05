@@ -1,5 +1,3 @@
-//! PyO3 binding layer for the `pynw._native` extension module.
-
 use ndarray::prelude::*;
 use numpy::{
     Element, IntoPyArray, PyArray, PyArray1, PyArrayMethods, PyReadonlyArray, get_array_module,
