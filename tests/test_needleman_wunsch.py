@@ -17,6 +17,13 @@ def test_return_types() -> None:
     np.testing.assert_equal(ops, [EditOp.Align, EditOp.Align, EditOp.Align])
 
 
+def test_score_return_type() -> None:
+    score = needleman_wunsch_score(np.eye(3, dtype=np.float64))
+    assert isinstance(score, float)
+    assert score == 3.0
+
+
+@pytest.mark.parametrize("func", [needleman_wunsch, needleman_wunsch_score])
 class TestInputValidation:
     @pytest.mark.parametrize(
         "similarity_matrix",
@@ -26,9 +33,9 @@ class TestInputValidation:
             pytest.param(np.float64(1.0), id="scalar"),
         ],
     )
-    def test_rejects_wrong_dim(self, similarity_matrix):
+    def test_rejects_wrong_dim(self, func, similarity_matrix):
         with pytest.raises(ValueError, match="2-dimensional"):
-            needleman_wunsch(similarity_matrix)
+            func(similarity_matrix)
 
     @pytest.mark.parametrize(
         "similarity_matrix, expected_score",
@@ -65,35 +72,36 @@ class TestInputValidation:
             ),
         ],
     )
-    def test_casts(self, similarity_matrix, expected_score) -> None:
-        score, _ = needleman_wunsch(similarity_matrix)
+    def test_casts(self, func, similarity_matrix, expected_score) -> None:
+        result = func(similarity_matrix)
+        score = result[0] if isinstance(result, tuple) else result
         assert isinstance(score, float)
         assert score == expected_score
 
-    def test_rejects_nan_in_matrix(self) -> None:
+    def test_rejects_nan_in_matrix(self, func) -> None:
         sm = np.array([[1.0, np.nan], [0.0, 1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm)
+            func(sm)
 
-    def test_rejects_inf_in_matrix(self) -> None:
+    def test_rejects_inf_in_matrix(self, func) -> None:
         sm = np.array([[1.0, np.inf], [0.0, 1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm)
+            func(sm)
 
-    def test_rejects_nan_gap_penalty(self) -> None:
+    def test_rejects_nan_gap_penalty(self, func) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, gap_penalty=float("nan"))
+            func(sm, gap_penalty=float("nan"))
 
-    def test_rejects_inf_insert_penalty(self) -> None:
+    def test_rejects_inf_insert_penalty(self, func) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, insert_penalty=float("inf"))
+            func(sm, insert_penalty=float("inf"))
 
-    def test_rejects_inf_delete_penalty(self) -> None:
+    def test_rejects_inf_delete_penalty(self, func) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            needleman_wunsch(sm, delete_penalty=float("inf"))
+            func(sm, delete_penalty=float("inf"))
 
 
 class TestEmptyAndDegenerateMatrices:
@@ -321,8 +329,9 @@ class TestStructuralInvariants:
         self.assert_structural_invariants(ops, n, m)
 
 
+@pytest.mark.hypothesis
 @given(alignment_inputs())
-def test_equivalence(inputs: tuple) -> None:
+def test_score_matches_needleman_wunsch(inputs: tuple) -> None:
     matrix, _, _, insert_penalty, delete_penalty = inputs
     score_1, _ = needleman_wunsch(
         matrix,
