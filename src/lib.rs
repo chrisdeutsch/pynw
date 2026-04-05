@@ -140,17 +140,12 @@ mod pynw_native {
         py: Python<'py>,
         ops: Bound<'py, PyAny>,
     ) -> PyResult<AlignmentIndicesResult<'py>> {
-        let ops: Vec<nw::EditOp> = to_array1_u8(py, &ops)?
-            .as_slice()?
-            .iter()
-            .map(|&x| {
-                nw::EditOp::try_from(x).map_err(|_| {
-                    pyo3::exceptions::PyValueError::new_err("Cannot convert u8 into EditOp")
-                })
-            })
-            .collect::<PyResult<_>>()?;
+        let pyarray = to_array1_u8(py, &ops)?;
 
-        let (source, target) = nw::alignment_indices((&ops).into());
+        let ops = nw::as_editops(pyarray.as_array())
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+
+        let (source, target) = nw::alignment_indices(ops);
 
         Ok((
             source.indices.into_pyarray(py),

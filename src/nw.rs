@@ -34,6 +34,16 @@ pub(crate) enum EditOp {
     Delete = 2,
 }
 
+pub fn as_editops<D: Dimension>(
+    array: ArrayView<u8, D>,
+) -> Result<ArrayView<EditOp, D>, &'static str> {
+    if array.iter().all(|&x| EditOp::try_from(x).is_ok()) {
+        Ok(unsafe { array.raw_view().cast::<EditOp>().deref_into_view() })
+    } else {
+        Err("Cannot convert u8 into EditOp")
+    }
+}
+
 pub(crate) struct MaskedIndexArray {
     pub indices: Array1<isize>,
     pub mask: Array1<bool>,
