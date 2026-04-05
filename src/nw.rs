@@ -55,13 +55,60 @@ pub(crate) fn needleman_wunsch(
     insert_penalty: f64,
     delete_penalty: f64,
 ) -> (f64, Array1<EditOp>) {
-    let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let (dp, tb) = fill_matrices(align_scores, insert_penalty, delete_penalty);
-    let ops = traceback_ops(tb.view());
-    let score = dp[[n, m]];
+    let (score, pointers) = fill_matrices(align_scores, insert_penalty, delete_penalty);
+    let ops = traceback_ops(pointers.view());
 
-    // TODO: Return array of scores?
     (score, ops)
+}
+
+pub(crate) fn needleman_wunsch_score(
+    align_scores: ArrayView2<f64>,
+    insert_penalty: f64,
+    delete_penalty: f64,
+) -> f64 {
+    let (n, m) = (align_scores.nrows(), align_scores.ncols());
+
+    let mut dp = Array2::<f64>::zeros((2, m + 1));
+    for col in 0..=m {
+        dp[[0, col]] = col as f64 * insert_penalty;
+    }
+
+    for row in 1..=n {
+        let (prev, curr) = ((row - 1) % 2, row % 2);
+        dp[[curr, 0]] = dp[[prev, 0]] + delete_penalty;
+
+        for col in 1..=m {
+            let align = dp[[prev, col - 1]] + align_scores[[row - 1, col - 1]];
+            let delete = dp[[prev, col]] + delete_penalty;
+            let insert = dp[[curr, col - 1]] + insert_penalty;
+
+            // Sequential max rather than a three-way if/else chain.
+            //
+            // When this function only produces a float (no EditOp alongside it),
+            // LLVM turns a three-way if/else into a branchless bitwise-select
+            // sequence (~13 SSE instructions: cmpltsd, andpd, andnpd, orpd, …).
+            // By contrast, fill_matrices computes an integer EditOp in the same
+            // branch, which forces LLVM to use two conditional jumps (~8
+            // instructions) — fast in practice because the CPU's branch predictor
+            // handles accumulated DP values well.
+            //
+            // The sequential-max formulation compiles to two `maxsd` instructions,
+            // beating both alternatives.  It also preserves the Align > Delete >
+            // Insert tie-breaking: `maxsd dst, src` returns `src` on equality, so
+            // the earlier winner (align, then delete) survives a tie with a later
+            // candidate (delete, then insert).
+            let mut score = align;
+            if delete > score {
+                score = delete;
+            }
+            if insert > score {
+                score = insert;
+            }
+            dp[[curr, col]] = score;
+        }
+    }
+
+    dp[[n % 2, m]]
 }
 
 pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
@@ -114,7 +161,7 @@ fn fill_matrices(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
-) -> (Array2<f64>, Array2<EditOp>) {
+) -> (f64, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
 
     let mut dp_table = Array2::zeros((n + 1, m + 1));
@@ -153,12 +200,7 @@ fn fill_matrices(
         }
     }
 
-    (dp_table, pointers)
-}
-
-fn alignment_score(align_scores: ArrayView2<f64>, insert_penalty: f64, delete_penalty: f64) -> f64 {
-    let (_n, _m) = (align_scores.nrows(), align_scores.ncols());
-    f64::NAN
+    (dp_table[[n, m]], pointers)
 }
 
 /// Returns equal-length `(source_idx, target_idx)` (at most `n + m`).

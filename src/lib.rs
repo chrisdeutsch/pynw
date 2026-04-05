@@ -1,6 +1,6 @@
 //! PyO3 binding layer for the `pynw._native` extension module.
 
-use ndarray::Dimension;
+use ndarray::prelude::*;
 use numpy::{
     Element, IntoPyArray, PyArray, PyArray1, PyArrayMethods, PyReadonlyArray, get_array_module,
 };
@@ -109,24 +109,41 @@ mod pynw_native {
         let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
         let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
 
-        if !insert_penalty.is_finite() {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "insert_penalty is non-finite",
-            ));
-        }
-        if !delete_penalty.is_finite() {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "delete_penalty is non-finite",
-            ));
-        }
-        if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "similarity_matrix contains non-finite values (NaN or Inf)",
-            ));
-        }
+        validate_inputs(similarity_matrix, insert_penalty, delete_penalty)?;
 
         let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
         Ok((score, ops.mapv(Into::into).into_pyarray(py)))
+    }
+
+    #[pyfunction]
+    #[pyo3(
+        signature = (similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
+        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None)",
+    )]
+    fn needleman_wunsch_score<'py>(
+        py: Python<'py>,
+        similarity_matrix: Bound<'py, PyAny>,
+        gap_penalty: f64,
+        insert_penalty: Option<f64>,
+        delete_penalty: Option<f64>,
+    ) -> PyResult<f64> {
+        let pyarray = to_pyreadonly(py, similarity_matrix).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 2-dimensional float64 array",
+            )
+        })?;
+        let similarity_matrix = pyarray.as_array();
+
+        let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
+        let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
+
+        validate_inputs(similarity_matrix, insert_penalty, delete_penalty)?;
+
+        Ok(nw::needleman_wunsch_score(
+            similarity_matrix,
+            insert_penalty,
+            delete_penalty,
+        ))
     }
 
     type AlignmentIndicesResult<'py> = (
@@ -197,4 +214,27 @@ where
                 "Cannot convert array-like into the expected array type",
             )
         })
+}
+
+fn validate_inputs(
+    similarity_matrix: ArrayView2<f64>,
+    insert_penalty: f64,
+    delete_penalty: f64,
+) -> PyResult<()> {
+    if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "similarity_matrix contains non-finite values (NaN or Inf)",
+        ));
+    }
+    if !insert_penalty.is_finite() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "insert_penalty is non-finite",
+        ));
+    }
+    if !delete_penalty.is_finite() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "delete_penalty is non-finite",
+        ));
+    }
+    Ok(())
 }

@@ -82,6 +82,18 @@ def needleman_wunsch(
     """
     ...
 
+def needleman_wunsch_score(
+    similarity_matrix: npt.ArrayLike,
+    *,
+    gap_penalty: float = -1.0,
+    insert_penalty: float | None = None,
+    delete_penalty: float | None = None,
+) -> float:
+    """
+    TODO
+    """
+    ...
+
 def alignment_indices(
     ops: npt.ArrayLike,
 ) -> tuple[

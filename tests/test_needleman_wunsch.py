@@ -3,7 +3,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from pynw import needleman_wunsch
+from pynw import needleman_wunsch, needleman_wunsch_score
 from pynw._ops import EditOp
 
 
@@ -319,3 +319,19 @@ class TestStructuralInvariants:
             delete_penalty=delete_penalty,
         )
         self.assert_structural_invariants(ops, n, m)
+
+
+@given(alignment_inputs())
+def test_equivalence(inputs: tuple) -> None:
+    matrix, _, _, insert_penalty, delete_penalty = inputs
+    score_1, _ = needleman_wunsch(
+        matrix,
+        insert_penalty=insert_penalty,
+        delete_penalty=delete_penalty,
+    )
+    score_2 = needleman_wunsch_score(
+        matrix,
+        insert_penalty=insert_penalty,
+        delete_penalty=delete_penalty,
+    )
+    assert score_1 == pytest.approx(score_2)
