@@ -6,19 +6,20 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Rust-accelerated [Needleman-Wunsch](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm)
-global sequence alignment for precomputed similarity matrices. Python
-bindings are built with [PyO3](https://pyo3.rs).
+global sequence alignment for user-supplied similarity matrices. Python bindings
+are built with [PyO3](https://pyo3.rs).
 
-Align two ordered sequences, allowing for gaps (insertions/deletions), given any
-precomputed pairwise similarity matrix. Useful for strings, time series, token
-sequences, or any domain where element order matters.
+Align two ordered sequences given any precomputed pairwise similarity matrix.
+Unlike string-distance or bioinformatics libraries, which are designed around
+specific alphabets and scoring rules, `pynw` accepts whatever scores you
+provide: cosine similarity of embeddings, model outputs, or distance metrics.
 
 ## Features
 
 - **Fast:** Alignment runs in $O(nm)$ time; a `1000×1000` matrix takes <10 ms on modern CPUs.
-- **NumPy-first:** Accepts NumPy arrays directly — no intermediate Python objects.
-- **Domain-agnostic:** Operates on a precomputed similarity matrix, so any scoring function (distance metrics, semantic similarity, etc.) works out of the box.
-- **Asymmetric gaps:** Optionally set separate insert and delete penalties.
+- **NumPy-first:** Pass NumPy arrays directly, no conversion needed.
+- **Domain-agnostic:** Operates on a precomputed similarity matrix; the scoring function is up to you.
+- **Asymmetric gaps:** Penalize inserts and deletes independently.
 
 ## Installation
 
@@ -34,30 +35,162 @@ distribution. This requires a [Rust toolchain](https://rustup.rs/) (1.85+).
 
 ## Quick start
 
-Align two DNA sequences using a simple match/mismatch scoring scheme:
+Using `pynw` involves three steps:
+
+1. **Build a similarity matrix.** Compute pairwise scores between every element
+   of your two sequences using any scoring function.
+2. **Run the alignment.** Pass the matrix and a gap penalty to
+   `needleman_wunsch`. The gap penalty controls when leaving an element unmatched
+   is preferable to a low-scoring match.
+3. **Interpret the results.** The returned edit operations tell you which
+   elements were aligned, inserted, or deleted.
+
+The example below aligns two word sequences. The similarity matrix is built from
+[GloVe](https://nlp.stanford.edu/projects/glove/) cosine similarities, letting
+semantically related words align even without an exact match:
 
 ```python
 import numpy as np
 from pynw import needleman_wunsch, alignment_indices
 
-seq1 = np.array(list("GATTACA"))
-seq2 = np.array(list("GCATGCA"))
+source = np.array(
+    ["clever", "sneaky", "fox", "leaped"]
+)
+target = np.array(
+    ["sly", "fox", "jumped", "across"]
+)
 
-# Build an (n, m) similarity matrix: +1 for match, -1 for mismatch
-similarity_matrix = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
+# Cosine similarity from GloVe (glove-wiki-gigaword-50)
+similarity_matrix = np.array([
+    # sly     fox     jumped  across
+    [ 0.65,   0.25,   0.06,   0.20],  # clever
+    [ 0.57,   0.06,  -0.14,  -0.05],  # sneaky
+    [ 0.26,   1.00,   0.30,   0.41],  # fox
+    [-0.00,   0.07,   0.77,   0.35],  # leaped
+])
 
-score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
-src_idx, tgt_idx = alignment_indices(ops)
+# Each gap deducts 0.5 from the total score; increase the penalty to force
+# more alignments, decrease it to allow more gaps
+score, editops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
+src_idx, tgt_idx = alignment_indices(editops)
 
 # Reconstruct aligned sequences; masked positions are gaps
-aligned1 = np.ma.array(seq1).take(src_idx).filled("-")
-aligned2 = np.ma.array(seq2).take(tgt_idx).filled("-")
+aligned_src = np.ma.array(source).take(src_idx).filled("-")
+aligned_tgt = np.ma.array(target).take(tgt_idx).filled("-")
 
-print(f"Score: {score}\n{''.join(aligned1)}\n{''.join(aligned2)}")
-# Score: 2.0
-# G-ATTACA
-# GCA-TGCA
+print(f"Score: {round(score, 2)}")
+for s, t in zip(aligned_src, aligned_tgt):
+    print(f"  {s:10s}  {t}")
+
+# Score: 1.42
+#   clever     sly       (semantic match)
+#   sneaky     -         (deleted)
+#   fox        fox       (exact match)
+#   leaped     jumped    (semantic match)
+#   -          across    (inserted)
 ```
+
+## User Guide
+
+`pynw` exposes two alignment functions and a helper for interpreting results.
+Which function you need depends on whether you need just the score or the full
+alignment.
+
+### Score only: `needleman_wunsch_score`
+
+Use `needleman_wunsch_score` when you only need the alignment score, for
+example when ranking or filtering many sequence pairs. It skips the traceback
+entirely, using O(m) memory instead of O(nm):
+
+```python
+from pynw import needleman_wunsch_score
+
+score = needleman_wunsch_score(similarity_matrix)
+```
+
+### Score and alignment: `needleman_wunsch`
+
+Use `needleman_wunsch` when you need to know _how_ the sequences were aligned.
+It returns the optimal score along with an array of edit operations (`editops`).
+Each element in the editops array is one of three `EditOp` values:
+
+- `EditOp.Align`: a source element is matched with a target element.
+- `EditOp.Delete`: a source element is consumed with no matching target element
+  (gap in target).
+- `EditOp.Insert`: a target element is consumed with no matching source element
+  (gap in source).
+
+The editops array alone is enough for aggregate statistics:
+
+```python
+from pynw import EditOp, needleman_wunsch
+
+score, editops = needleman_wunsch(similarity_matrix)
+
+n_aligned = np.sum(editops == EditOp.Align)
+n_inserted = np.sum(editops == EditOp.Insert)
+n_deleted = np.sum(editops == EditOp.Delete)
+```
+
+### Reconstructing the alignment: `alignment_indices`
+
+Use `alignment_indices` when you need to map alignment positions back to the
+original sequences. It converts the editops array into two masked index arrays: one
+for the source, one for the target. Each array has one entry per alignment
+position. Positions where the corresponding sequence has a gap are masked.
+
+```python
+from pynw import alignment_indices
+
+src_idx, tgt_idx = alignment_indices(editops)
+```
+
+Because the indices are masked arrays, `take` propagates the mask and `filled`
+substitutes a value at gap positions. This makes it easy to reconstruct aligned
+sequences with gap markers:
+
+```python
+source = np.ma.array(["the", "quick", "fox"])
+target = np.ma.array(["the", "slow", "red", "fox"])
+
+aligned_src = source.take(src_idx).filled("-")
+aligned_tgt = target.take(tgt_idx).filled("-")
+# aligned_src: ['the', 'quick', '-',   'fox']
+# aligned_tgt: ['the', 'slow',  'red', 'fox']
+```
+
+When iterating over a masked array, masked positions yield the `np.ma.masked`
+sentinel instead of an integer. This means you can iterate over `editops` and the
+index arrays together without checking masks explicitly. In the diff example
+below, `s` is masked at Insert positions and `t` is masked at Delete positions,
+so only the valid index is used in each branch:
+
+```python
+for op, s, t in zip(editops, src_idx, tgt_idx):
+    if op == EditOp.Align:
+        print(f"  {source[s]}")
+    elif op == EditOp.Delete:
+        print(f"- {source[s]}")
+    elif op == EditOp.Insert:
+        print(f"+ {target[t]}")
+```
+
+### Asymmetric gap penalties
+
+By default, `gap_penalty` applies equally to insertions and deletions. To
+penalize them independently, pass `insert_penalty` and/or `delete_penalty`:
+
+```python
+score, editops = needleman_wunsch(
+    similarity_matrix,
+    insert_penalty=-0.3,
+    delete_penalty=-0.7,
+)
+```
+
+When set, these override `gap_penalty` for the corresponding direction. This is
+useful when the cost of missing a source element differs from the cost of
+introducing a spurious target element.
 
 ## Details
 

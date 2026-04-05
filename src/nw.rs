@@ -38,11 +38,11 @@ pub fn parse_editops<D: Dimension>(
     array: ArrayView<u8, D>,
 ) -> Result<Array<EditOp, D>, &'static str> {
     let dim = array.dim();
-    let ops: Vec<EditOp> = array
+    let editops: Vec<EditOp> = array
         .iter()
         .map(|&x| EditOp::try_from(x).map_err(|_| "Cannot convert u8 into EditOp"))
         .collect::<Result<_, _>>()?;
-    Array::from_shape_vec(dim, ops).map_err(|_| "Shape error")
+    Array::from_shape_vec(dim, editops).map_err(|_| "Shape error")
 }
 
 pub(crate) struct MaskedIndexArray {
@@ -54,18 +54,57 @@ pub(crate) fn needleman_wunsch(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
-) -> (f64, Vec<EditOp>) {
-    let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let (dp, tb) = fill_matrices(align_scores, insert_penalty, delete_penalty);
-    let ops = traceback_ops(tb.view());
-    let score = dp[[n, m]];
-
-    // TODO: Return array of scores?
-    (score, ops)
+) -> (f64, Array1<EditOp>) {
+    let (score, traceback) = fill_traceback(align_scores, insert_penalty, delete_penalty);
+    let editops = traceback_editops(traceback.view());
+    (score, editops)
 }
 
-pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
-    let k = ops.len();
+pub(crate) fn needleman_wunsch_score(
+    align_scores: ArrayView2<f64>,
+    insert_penalty: f64,
+    delete_penalty: f64,
+) -> f64 {
+    let (n, m) = (align_scores.nrows(), align_scores.ncols());
+
+    let mut prev_row = Array1::<f64>::zeros(m + 1);
+    let mut curr_row = Array1::<f64>::zeros(m + 1);
+    for col in 1..=m {
+        prev_row[col] = col as f64 * insert_penalty;
+    }
+
+    for row in 1..=n {
+        curr_row[0] = prev_row[0] + delete_penalty;
+
+        for col in 1..=m {
+            let align = prev_row[col - 1] + align_scores[[row - 1, col - 1]];
+            let delete = prev_row[col] + delete_penalty;
+            let insert = curr_row[col - 1] + insert_penalty;
+
+            // Two sequential comparisons compile to two `maxsd` instructions,
+            // faster than a three-way if/else (branchless bitwise-select, ~13
+            // SSE instructions). Tie-breaking is preserved: `maxsd dst, src`
+            // returns `src` on equality, so align beats delete beats insert.
+            let mut score = align;
+            if delete > score {
+                score = delete;
+            }
+            if insert > score {
+                score = insert;
+            }
+            curr_row[col] = score;
+        }
+
+        std::mem::swap(&mut prev_row, &mut curr_row);
+    }
+
+    prev_row[m]
+}
+
+pub(crate) fn alignment_indices(
+    editops: ArrayView1<EditOp>,
+) -> (MaskedIndexArray, MaskedIndexArray) {
+    let k = editops.len();
 
     let mut source = MaskedIndexArray {
         indices: Array1::zeros(k),
@@ -79,7 +118,7 @@ pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, M
     let mut source_index: isize = 0;
     let mut target_index: isize = 0;
 
-    for (i, &op) in ops.iter().enumerate() {
+    for (i, &op) in editops.iter().enumerate() {
         source.indices[i] = source_index;
         target.indices[i] = target_index;
 
@@ -105,36 +144,40 @@ pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, M
     (source, target)
 }
 
-/// Build `(n+1, m+1)` DP score and traceback direction matrices.
+/// Build the traceback direction matrix and return the final score.
 ///
-/// Both matrices are `O(nm)`.  A rolling 2-row band could eliminate `dp`,
-/// but the `tb` matrix is still `O(nm)`.  True linear-space traceback
-/// requires Hirschberg's divide-and-conquer algorithm.
-fn fill_matrices(
+/// The DP score table is reduced to a rolling 2-row buffer (`O(m)` space). The
+/// traceback matrix must remain `O(nm)` because traceback reads it back-to-front
+/// after the fill. True linear-space traceback would require Hirschberg's
+/// divide-and-conquer algorithm.
+fn fill_traceback(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
-) -> (Array2<f64>, Array2<EditOp>) {
+) -> (f64, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let mut dp = Array2::zeros((n + 1, m + 1));
-    let mut tb = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
-    // First column: aligning i source-elements against nothing -> i target gaps.
-    for i in 1..=n {
-        dp[[i, 0]] = i as f64 * delete_penalty;
-        tb[[i, 0]] = EditOp::Delete;
-    }
+    let mut prev_row = Array1::<f64>::zeros(m + 1);
+    let mut curr_row = Array1::<f64>::zeros(m + 1);
+
+    // Each cell stores the editop that produced its score, i.e. a pointer back
+    // to the predecessor cell.
+    let mut traceback = Array2::from_elem((n + 1, m + 1), EditOp::Align);
+
     // First row: aligning j target-elements against nothing -> j source gaps.
     for j in 1..=m {
-        dp[[0, j]] = j as f64 * insert_penalty;
-        tb[[0, j]] = EditOp::Insert;
+        prev_row[j] = j as f64 * insert_penalty;
+        traceback[[0, j]] = EditOp::Insert;
     }
 
     for i in 1..=n {
+        curr_row[0] = prev_row[0] + delete_penalty;
+        traceback[[i, 0]] = EditOp::Delete;
+
         for j in 1..=m {
-            let align = dp[[i - 1, j - 1]] + align_scores[[i - 1, j - 1]];
-            let delete = dp[[i - 1, j]] + delete_penalty;
-            let insert = dp[[i, j - 1]] + insert_penalty;
+            let align = prev_row[j - 1] + align_scores[[i - 1, j - 1]];
+            let delete = prev_row[j] + delete_penalty;
+            let insert = curr_row[j - 1] + insert_penalty;
 
             // Tie-breaking: align > delete > insert
             let (score, op) = if insert > delete && insert > align {
@@ -145,30 +188,32 @@ fn fill_matrices(
                 (align, EditOp::Align)
             };
 
-            dp[[i, j]] = score;
-            tb[[i, j]] = op;
+            curr_row[j] = score;
+            traceback[[i, j]] = op;
         }
+
+        std::mem::swap(&mut prev_row, &mut curr_row);
     }
 
-    (dp, tb)
+    (prev_row[m], traceback)
 }
 
 /// Returns equal-length `(source_idx, target_idx)` (at most `n + m`).
 ///
 /// Debug-asserts that the traceback never underflows.  This invariant is
-/// guaranteed by the boundary initialisation in [`fill_matrices`]:
+/// guaranteed by the boundary initialisation in [`fill_traceback`]:
 /// column 0 is always `Up` and row 0 is always `Left`.
-fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
-    let (n, m) = (traceback_matrix.nrows() - 1, traceback_matrix.ncols() - 1);
+fn traceback_editops(traceback: ArrayView2<EditOp>) -> Array1<EditOp> {
+    let (n, m) = (traceback.nrows() - 1, traceback.ncols() - 1);
 
-    let mut ops = Vec::with_capacity(n + m);
+    let mut editops = Vec::with_capacity(n + m);
 
     let mut i = n;
     let mut j = m;
 
     while i > 0 || j > 0 {
-        let op = traceback_matrix[[i, j]];
-        ops.push(op);
+        let op = traceback[[i, j]];
+        editops.push(op);
 
         match op {
             EditOp::Align => {
@@ -187,6 +232,6 @@ fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
         }
     }
 
-    ops.reverse();
-    ops
+    editops.reverse();
+    Array1::from(editops)
 }

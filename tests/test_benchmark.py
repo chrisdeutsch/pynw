@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from pynw import alignment_indices, needleman_wunsch
+from pynw import alignment_indices, needleman_wunsch, needleman_wunsch_score
 from pynw._ops import EditOp, _alignment_indices_numpy
 
 scipy_optimize = pytest.importorskip("scipy.optimize")
@@ -40,6 +40,13 @@ def test_benchmark_needleman_wunsch(benchmark, size: int) -> None:
     score_matrix = _score_matrix(size)
     benchmark.group = f"matrix {size}x{size}"
     benchmark(needleman_wunsch, score_matrix)
+
+
+@pytest.mark.parametrize("size", MATRIX_SIZES, ids=lambda n: f"{n}x{n}")
+def test_benchmark_needleman_wunsch_score(benchmark, size: int) -> None:
+    score_matrix = _score_matrix(size)
+    benchmark.group = f"matrix {size}x{size}"
+    benchmark(needleman_wunsch_score, score_matrix)
 
 
 @pytest.mark.parametrize("size", MATRIX_SIZES, ids=lambda n: f"{n}x{n}")
