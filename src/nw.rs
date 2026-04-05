@@ -23,8 +23,8 @@
 //! All values in the similarity matrix and gap penalties must be finite.
 //! Non-finite values (`NaN`, `Inf`) cause undefined output.
 
+use ndarray::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use numpy::ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
 #[derive(Clone, Copy, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
@@ -32,6 +32,17 @@ pub(crate) enum EditOp {
     Align = 0,
     Insert = 1,
     Delete = 2,
+}
+
+pub fn parse_editops<D: Dimension>(
+    array: ArrayView<u8, D>,
+) -> Result<Array<EditOp, D>, &'static str> {
+    let dim = array.dim();
+    let ops: Vec<EditOp> = array
+        .iter()
+        .map(|&x| EditOp::try_from(x).map_err(|_| "Cannot convert u8 into EditOp"))
+        .collect::<Result<_, _>>()?;
+    Array::from_shape_vec(dim, ops).map_err(|_| "Shape error")
 }
 
 pub(crate) struct MaskedIndexArray {
