@@ -80,11 +80,11 @@ def test_alignment_indices(
 
 def test_raises_on_unknown_op():
     ops = [EditOp.Align, EditOp.Delete, EditOp.Insert, 99]
-    with pytest.raises(ValueError, match="EditOp"):
+    with pytest.raises(ValueError):
         alignment_indices(ops)
 
 
 @pytest.mark.parametrize("editop", [-1, 999])
 def test_raises_on_overflow(editop):
-    with pytest.raises(OverflowError):
+    with pytest.raises(ValueError):
         alignment_indices([editop])

@@ -1,8 +1,8 @@
 //! PyO3 binding layer for the `pynw._native` extension module.
 
+use ndarray::Dimension;
 use numpy::{
-    Element, IntoPyArray, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2,
-    get_array_module,
+    Element, IntoPyArray, PyArray, PyArray1, PyArrayMethods, PyReadonlyArray, get_array_module,
 };
 use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
@@ -99,8 +99,12 @@ mod pynw_native {
         insert_penalty: Option<f64>,
         delete_penalty: Option<f64>,
     ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
-        let py_array = to_array2_f64(py, &similarity_matrix)?;
-        let similarity_matrix = py_array.as_array();
+        let pyarray = to_pyreadonly(py, similarity_matrix).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 2-dimensional float64 array",
+            )
+        })?;
+        let similarity_matrix = pyarray.as_array();
 
         let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
         let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
@@ -140,7 +144,11 @@ mod pynw_native {
         py: Python<'py>,
         ops: Bound<'py, PyAny>,
     ) -> PyResult<AlignmentIndicesResult<'py>> {
-        let pyarray = to_array1_u8(py, &ops)?;
+        let pyarray = to_pyreadonly(py, ops).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 1-dimensional u8 array",
+            )
+        })?;
         let ops = nw::parse_editops(pyarray.as_array())
             .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
@@ -158,7 +166,7 @@ mod pynw_native {
 // Modified version of the PyArrayLike extract method. Calls numpy.asarray(obj, dtype=dtype).
 fn numpy_asarray<'py>(
     py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
+    obj: Bound<'py, PyAny>,
     dtype: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     static AS_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
@@ -172,35 +180,23 @@ fn numpy_asarray<'py>(
     as_array.call((obj,), Some(&kwargs))
 }
 
-fn to_array2_f64<'py>(
+fn to_pyreadonly<'py, A, D>(
     py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<PyReadonlyArray2<'py, f64>> {
-    if let Ok(array) = obj.cast::<PyArray2<f64>>() {
-        // TODO: Check that array is C-contiguous?
+    obj: Bound<'py, PyAny>,
+) -> PyResult<PyReadonlyArray<'py, A, D>>
+where
+    A: Element,
+    D: Dimension,
+{
+    if let Ok(array) = obj.cast::<PyArray<A, D>>() {
         return Ok(array.readonly());
     }
-    numpy_asarray(py, obj, f64::get_dtype(py).into_any())?
-        .extract()
-        .map_err(|_| {
-            pyo3::exceptions::PyValueError::new_err(
-                "Cannot convert array-like into 2-dimensional float64 array",
-            )
-        })
-}
 
-fn to_array1_u8<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<PyReadonlyArray1<'py, u8>> {
-    if let Ok(array) = obj.cast::<PyArray1<u8>>() {
-        return Ok(array.readonly());
-    }
-    numpy_asarray(py, obj, u8::get_dtype(py).into_any())?
+    numpy_asarray(py, obj, A::get_dtype(py).into_any())?
         .extract()
         .map_err(|_| {
             pyo3::exceptions::PyValueError::new_err(
-                "Cannot convert array-like into 1-dimensional u8 array",
+                "Cannot convert array-like into the expected array type",
             )
         })
 }

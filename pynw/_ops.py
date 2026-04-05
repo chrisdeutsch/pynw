@@ -78,11 +78,9 @@ def alignment_indices(
     Raises
     ------
     ValueError
-        If ``ops`` cannot be converted to a 1-D ``uint8`` array, or if any
-        element is not a valid ``EditOp`` discriminant.
-    OverflowError
-        If ``ops`` contains Python integers too large to convert to an 8-bit
-        unsigned integer.
+        If ``ops`` cannot be converted to a 1-D ``uint8`` array, if any
+        element is out of the ``uint8`` range, or if any element is not a
+        valid ``EditOp`` discriminant.
 
     Examples
     --------
