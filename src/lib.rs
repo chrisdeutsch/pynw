@@ -1,6 +1,6 @@
 //! PyO3 binding layer for the `pynw._native` extension module.
 
-use ndarray::Dimension;
+use ndarray::prelude::*;
 use numpy::{
     Element, IntoPyArray, PyArray, PyArray1, PyArrayMethods, PyReadonlyArray, get_array_module,
 };
@@ -109,26 +109,93 @@ mod pynw_native {
         let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
         let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
 
-        if !insert_penalty.is_finite() {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "insert_penalty is non-finite",
-            ));
-        }
-        if !delete_penalty.is_finite() {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "delete_penalty is non-finite",
-            ));
-        }
-        if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "similarity_matrix contains non-finite values (NaN or Inf)",
-            ));
-        }
+        validate_inputs(similarity_matrix, insert_penalty, delete_penalty)?;
 
         let (score, ops) = nw::needleman_wunsch(similarity_matrix, insert_penalty, delete_penalty);
+        Ok((score, ops.mapv(Into::into).into_pyarray(py)))
+    }
 
-        let ops: Vec<u8> = ops.into_iter().map(Into::into).collect();
-        Ok((score, ops.into_pyarray(py)))
+    // NOTE: This doc comment provides the runtime `help()` docstring.
+    // A copy exists in pynw/_native.pyi for type checkers and IDE support.
+    // Keep both copies in sync.
+    //
+    /// Compute the optimal Needleman-Wunsch alignment score without the traceback.
+    ///
+    /// Returns the same score as ``needleman_wunsch`` but uses O(m) memory instead
+    /// of O(n*m) by retaining only two rows of the DP table at a time. The runtime
+    /// difference between the two is minor. Use this function when you need the
+    /// score but not the alignment itself.
+    ///
+    /// Parameters
+    /// ----------
+    /// similarity_matrix : array_like, shape (n, m)
+    ///     ``similarity_matrix[i, j]`` is the similarity score for aligning
+    ///     element *i* of the source sequence with element *j* of the target
+    ///     sequence.
+    /// gap_penalty : float, default -1.0
+    ///     Penalty applied when a gap is inserted in either sequence.
+    ///     Use ``insert_penalty`` or ``delete_penalty`` to set them
+    ///     independently.
+    /// insert_penalty : float, optional
+    ///     Penalty for advancing the target sequence without consuming a source
+    ///     element (gap in source).  Defaults to ``gap_penalty``.
+    /// delete_penalty : float, optional
+    ///     Penalty for advancing the source sequence without consuming a target
+    ///     element (gap in target).  Defaults to ``gap_penalty``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``similarity_matrix`` is not 2-dimensional, or if any value in
+    ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
+    ///
+    /// Returns
+    /// -------
+    /// score : float
+    ///     The optimal alignment score.
+    ///
+    /// Examples
+    /// --------
+    /// >>> import numpy as np
+    /// >>> seq1 = np.array(list("GATTACA"))
+    /// >>> seq2 = np.array(list("GCATGCA"))
+    /// >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
+    /// >>> needleman_wunsch_score(sm, gap_penalty=-1.0)
+    /// 2.0
+    ///
+    /// Notes
+    /// -----
+    /// All values in ``similarity_matrix`` and the gap penalties must be finite.
+    ///
+    #[pyfunction]
+    #[pyo3(
+        signature = (similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
+        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None)",
+    )]
+    fn needleman_wunsch_score<'py>(
+        py: Python<'py>,
+        similarity_matrix: Bound<'py, PyAny>,
+        gap_penalty: f64,
+        insert_penalty: Option<f64>,
+        delete_penalty: Option<f64>,
+    ) -> PyResult<f64> {
+        let pyarray = to_pyreadonly(py, similarity_matrix).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(
+                "Cannot convert array-like into 2-dimensional float64 array",
+            )
+        })?;
+        let similarity_matrix = pyarray.as_array();
+
+        let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
+        let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
+
+        validate_inputs(similarity_matrix, insert_penalty, delete_penalty)?;
+
+        Ok(nw::needleman_wunsch_score(
+            similarity_matrix,
+            insert_penalty,
+            delete_penalty,
+        ))
     }
 
     type AlignmentIndicesResult<'py> = (
@@ -199,4 +266,27 @@ where
                 "Cannot convert array-like into the expected array type",
             )
         })
+}
+
+fn validate_inputs(
+    similarity_matrix: ArrayView2<f64>,
+    insert_penalty: f64,
+    delete_penalty: f64,
+) -> PyResult<()> {
+    if !similarity_matrix.iter().all(|v: &f64| v.is_finite()) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "similarity_matrix contains non-finite values (NaN or Inf)",
+        ));
+    }
+    if !insert_penalty.is_finite() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "insert_penalty is non-finite",
+        ));
+    }
+    if !delete_penalty.is_finite() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "delete_penalty is non-finite",
+        ));
+    }
+    Ok(())
 }

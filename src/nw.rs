@@ -54,14 +54,61 @@ pub(crate) fn needleman_wunsch(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
-) -> (f64, Vec<EditOp>) {
-    let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let (dp, tb) = fill_matrices(align_scores, insert_penalty, delete_penalty);
-    let ops = traceback_ops(tb.view());
-    let score = dp[[n, m]];
+) -> (f64, Array1<EditOp>) {
+    let (score, pointers) = fill_matrices(align_scores, insert_penalty, delete_penalty);
+    let ops = traceback_ops(pointers.view());
 
-    // TODO: Return array of scores?
     (score, ops)
+}
+
+pub(crate) fn needleman_wunsch_score(
+    align_scores: ArrayView2<f64>,
+    insert_penalty: f64,
+    delete_penalty: f64,
+) -> f64 {
+    let (n, m) = (align_scores.nrows(), align_scores.ncols());
+
+    let mut dp = Array2::<f64>::zeros((2, m + 1));
+    for col in 0..=m {
+        dp[[0, col]] = col as f64 * insert_penalty;
+    }
+
+    for row in 1..=n {
+        let (prev, curr) = ((row - 1) % 2, row % 2);
+        dp[[curr, 0]] = dp[[prev, 0]] + delete_penalty;
+
+        for col in 1..=m {
+            let align = dp[[prev, col - 1]] + align_scores[[row - 1, col - 1]];
+            let delete = dp[[prev, col]] + delete_penalty;
+            let insert = dp[[curr, col - 1]] + insert_penalty;
+
+            // Sequential max rather than a three-way if/else chain.
+            //
+            // When this function only produces a float (no EditOp alongside it),
+            // LLVM turns a three-way if/else into a branchless bitwise-select
+            // sequence (~13 SSE instructions: cmpltsd, andpd, andnpd, orpd, …).
+            // By contrast, fill_matrices computes an integer EditOp in the same
+            // branch, which forces LLVM to use two conditional jumps (~8
+            // instructions) — fast in practice because the CPU's branch predictor
+            // handles accumulated DP values well.
+            //
+            // The sequential-max formulation compiles to two `maxsd` instructions,
+            // beating both alternatives.  It also preserves the Align > Delete >
+            // Insert tie-breaking: `maxsd dst, src` returns `src` on equality, so
+            // the earlier winner (align, then delete) survives a tie with a later
+            // candidate (delete, then insert).
+            let mut score = align;
+            if delete > score {
+                score = delete;
+            }
+            if insert > score {
+                score = insert;
+            }
+            dp[[curr, col]] = score;
+        }
+    }
+
+    dp[[n % 2, m]]
 }
 
 pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
@@ -114,27 +161,30 @@ fn fill_matrices(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
-) -> (Array2<f64>, Array2<EditOp>) {
+) -> (f64, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
-    let mut dp = Array2::zeros((n + 1, m + 1));
-    let mut tb = Array2::from_elem((n + 1, m + 1), EditOp::Align);
+
+    let mut dp_table = Array2::zeros((n + 1, m + 1));
+    // Each cell stores the editop that produced its score, i.e. a pointer back
+    // to the predecessor cell.
+    let mut pointers = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
     // First column: aligning i source-elements against nothing -> i target gaps.
     for i in 1..=n {
-        dp[[i, 0]] = i as f64 * delete_penalty;
-        tb[[i, 0]] = EditOp::Delete;
+        dp_table[[i, 0]] = i as f64 * delete_penalty;
+        pointers[[i, 0]] = EditOp::Delete;
     }
     // First row: aligning j target-elements against nothing -> j source gaps.
     for j in 1..=m {
-        dp[[0, j]] = j as f64 * insert_penalty;
-        tb[[0, j]] = EditOp::Insert;
+        dp_table[[0, j]] = j as f64 * insert_penalty;
+        pointers[[0, j]] = EditOp::Insert;
     }
 
     for i in 1..=n {
         for j in 1..=m {
-            let align = dp[[i - 1, j - 1]] + align_scores[[i - 1, j - 1]];
-            let delete = dp[[i - 1, j]] + delete_penalty;
-            let insert = dp[[i, j - 1]] + insert_penalty;
+            let align = dp_table[[i - 1, j - 1]] + align_scores[[i - 1, j - 1]];
+            let delete = dp_table[[i - 1, j]] + delete_penalty;
+            let insert = dp_table[[i, j - 1]] + insert_penalty;
 
             // Tie-breaking: align > delete > insert
             let (score, op) = if insert > delete && insert > align {
@@ -145,12 +195,12 @@ fn fill_matrices(
                 (align, EditOp::Align)
             };
 
-            dp[[i, j]] = score;
-            tb[[i, j]] = op;
+            dp_table[[i, j]] = score;
+            pointers[[i, j]] = op;
         }
     }
 
-    (dp, tb)
+    (dp_table[[n, m]], pointers)
 }
 
 /// Returns equal-length `(source_idx, target_idx)` (at most `n + m`).
@@ -158,8 +208,8 @@ fn fill_matrices(
 /// Debug-asserts that the traceback never underflows.  This invariant is
 /// guaranteed by the boundary initialisation in [`fill_matrices`]:
 /// column 0 is always `Up` and row 0 is always `Left`.
-fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
-    let (n, m) = (traceback_matrix.nrows() - 1, traceback_matrix.ncols() - 1);
+fn traceback_ops(pointers: ArrayView2<EditOp>) -> Array1<EditOp> {
+    let (n, m) = (pointers.nrows() - 1, pointers.ncols() - 1);
 
     let mut ops = Vec::with_capacity(n + m);
 
@@ -167,7 +217,7 @@ fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
     let mut j = m;
 
     while i > 0 || j > 0 {
-        let op = traceback_matrix[[i, j]];
+        let op = pointers[[i, j]];
         ops.push(op);
 
         match op {
@@ -188,5 +238,5 @@ fn traceback_ops(traceback_matrix: ArrayView2<EditOp>) -> Vec<EditOp> {
     }
 
     ops.reverse();
-    ops
+    Array1::from(ops)
 }
