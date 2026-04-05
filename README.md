@@ -17,9 +17,9 @@ provide: cosine similarity of embeddings, model outputs, or distance metrics.
 ## Features
 
 - **Fast:** Alignment runs in $O(nm)$ time; a `1000×1000` matrix takes <10 ms on modern CPUs.
-- **NumPy-first:** Accepts NumPy arrays directly — no intermediate Python objects.
-- **Domain-agnostic:** Operates on a precomputed similarity matrix, so any scoring function works out of the box.
-- **Asymmetric gaps:** Optionally penalize inserts and deletes separately.
+- **NumPy-first:** Pass NumPy arrays directly, no conversion needed.
+- **Domain-agnostic:** Operates on a precomputed similarity matrix; the scoring function is up to you.
+- **Asymmetric gaps:** Penalize inserts and deletes independently.
 
 ## Installation
 
@@ -35,19 +35,28 @@ distribution. This requires a [Rust toolchain](https://rustup.rs/) (1.85+).
 
 ## Quick start
 
-Align two token sequences using precomputed cosine similarity from
-[GloVe](https://nlp.stanford.edu/projects/glove/) embeddings. Semantically
-similar words align even without an exact match, and words with no good
-counterpart are assigned to a gap:
+Using `pynw` involves three steps:
+
+1. **Build a similarity matrix.** Compute pairwise scores between every element
+   of your two sequences using any scoring function.
+2. **Run the alignment.** Pass the matrix and a gap penalty to
+   `needleman_wunsch`. The gap penalty controls when leaving an element unmatched
+   is preferable to a low-scoring match.
+3. **Interpret the results.** The returned edit operations tell you which
+   elements were aligned, inserted, or deleted.
+
+The example below aligns two word sequences. The similarity matrix is built from
+[GloVe](https://nlp.stanford.edu/projects/glove/) cosine similarities, letting
+semantically related words align even without an exact match:
 
 ```python
 import numpy as np
 from pynw import needleman_wunsch, alignment_indices
 
-hypothesis = np.array(
+source = np.array(
     ["clever", "sneaky", "fox", "leaped"]
 )
-reference = np.array(
+target = np.array(
     ["sly", "fox", "jumped", "across"]
 )
 
@@ -60,23 +69,25 @@ similarity_matrix = np.array([
     [-0.00,   0.07,   0.77,   0.35],  # leaped
 ])
 
-# gap_penalty=-0.5 means: prefer a gap over aligning tokens with cosine similarity < 0.5
+# Each gap deducts 0.5 from the total score; increase the penalty to force
+# more alignments, decrease it to allow more gaps
 score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
 src_idx, tgt_idx = alignment_indices(ops)
 
 # Reconstruct aligned sequences; masked positions are gaps
-aligned_hyp = np.ma.array(hypothesis).take(src_idx).filled("-")
-aligned_ref = np.ma.array(reference).take(tgt_idx).filled("-")
+aligned_src = np.ma.array(source).take(src_idx).filled("-")
+aligned_tgt = np.ma.array(target).take(tgt_idx).filled("-")
 
 print(f"Score: {round(score, 2)}")
-for h, r in zip(aligned_hyp, aligned_ref):
-    print(f"  {h:10s}  {r}")
+for s, t in zip(aligned_src, aligned_tgt):
+    print(f"  {s:10s}  {t}")
+
 # Score: 1.42
-#   clever     sly       <- semantic match
-#   sneaky     -         <- deleted
-#   fox        fox       <- exact match
-#   leaped     jumped    <- semantic match
-#   -          across    <- inserted
+#   clever     sly       (semantic match)
+#   sneaky     -         (deleted)
+#   fox        fox       (exact match)
+#   leaped     jumped    (semantic match)
+#   -          across    (inserted)
 ```
 
 ## User Guide
