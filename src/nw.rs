@@ -55,8 +55,8 @@ pub(crate) fn needleman_wunsch(
     insert_penalty: f64,
     delete_penalty: f64,
 ) -> (f64, Array1<EditOp>) {
-    let (score, pointers) = fill_matrices(align_scores, insert_penalty, delete_penalty);
-    let ops = traceback_ops(pointers.view());
+    let (score, traceback) = fill_traceback(align_scores, insert_penalty, delete_penalty);
+    let ops = traceback_ops(traceback.view());
 
     (score, ops)
 }
@@ -87,7 +87,7 @@ pub(crate) fn needleman_wunsch_score(
             // When this function only produces a float (no EditOp alongside it),
             // LLVM turns a three-way if/else into a branchless bitwise-select
             // sequence (~13 SSE instructions: cmpltsd, andpd, andnpd, orpd, …).
-            // By contrast, fill_matrices computes an integer EditOp in the same
+            // By contrast, fill_traceback computes an integer EditOp in the same
             // branch, which forces LLVM to use two conditional jumps (~8
             // instructions) — fast in practice because the CPU's branch predictor
             // handles accumulated DP values well.
@@ -156,36 +156,33 @@ pub(crate) fn alignment_indices(ops: ArrayView1<EditOp>) -> (MaskedIndexArray, M
 
 /// Build the traceback direction matrix and return the final score.
 ///
-/// The DP score table is reduced to a rolling 2-row buffer (`O(m)` space).
-/// The pointers matrix must remain `O(nm)` because traceback reads it
-/// back-to-front after the fill.  True linear-space traceback would require
-/// Hirschberg's divide-and-conquer algorithm.
-fn fill_matrices(
+/// The DP score table is reduced to a rolling 2-row buffer (`O(m)` space). The
+/// traceback matrix must remain `O(nm)` because traceback reads it back-to-front
+/// after the fill. True linear-space traceback would require Hirschberg's
+/// divide-and-conquer algorithm.
+fn fill_traceback(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
 ) -> (f64, Array2<EditOp>) {
     let (n, m) = (align_scores.nrows(), align_scores.ncols());
 
-    // Rolling 2-row buffer: only the previous and current rows are needed to
-    // compute the next row's scores.  Two separate arrays let us bind named
-    // references to each row; std::mem::swap rotates them in O(1) at the end
-    // of each iteration without copying any data.
     let mut prev_row = Array1::<f64>::zeros(m + 1);
     let mut curr_row = Array1::<f64>::zeros(m + 1);
+
     // Each cell stores the editop that produced its score, i.e. a pointer back
     // to the predecessor cell.
-    let mut pointers = Array2::from_elem((n + 1, m + 1), EditOp::Align);
+    let mut traceback = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
     // First row: aligning j target-elements against nothing -> j source gaps.
     for j in 1..=m {
         prev_row[j] = j as f64 * insert_penalty;
-        pointers[[0, j]] = EditOp::Insert;
+        traceback[[0, j]] = EditOp::Insert;
     }
 
     for i in 1..=n {
         curr_row[0] = prev_row[0] + delete_penalty;
-        pointers[[i, 0]] = EditOp::Delete;
+        traceback[[i, 0]] = EditOp::Delete;
 
         for j in 1..=m {
             let align = prev_row[j - 1] + align_scores[[i - 1, j - 1]];
@@ -202,22 +199,22 @@ fn fill_matrices(
             };
 
             curr_row[j] = score;
-            pointers[[i, j]] = op;
+            traceback[[i, j]] = op;
         }
 
         std::mem::swap(&mut prev_row, &mut curr_row);
     }
 
-    (prev_row[m], pointers)
+    (prev_row[m], traceback)
 }
 
 /// Returns equal-length `(source_idx, target_idx)` (at most `n + m`).
 ///
 /// Debug-asserts that the traceback never underflows.  This invariant is
-/// guaranteed by the boundary initialisation in [`fill_matrices`]:
+/// guaranteed by the boundary initialisation in [`fill_traceback`]:
 /// column 0 is always `Up` and row 0 is always `Left`.
-fn traceback_ops(pointers: ArrayView2<EditOp>) -> Array1<EditOp> {
-    let (n, m) = (pointers.nrows() - 1, pointers.ncols() - 1);
+fn traceback_ops(traceback: ArrayView2<EditOp>) -> Array1<EditOp> {
+    let (n, m) = (traceback.nrows() - 1, traceback.ncols() - 1);
 
     let mut ops = Vec::with_capacity(n + m);
 
@@ -225,7 +222,7 @@ fn traceback_ops(pointers: ArrayView2<EditOp>) -> Array1<EditOp> {
     let mut j = m;
 
     while i > 0 || j > 0 {
-        let op = pointers[[i, j]];
+        let op = traceback[[i, j]];
         ops.push(op);
 
         match op {
