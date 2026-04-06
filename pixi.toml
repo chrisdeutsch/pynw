@@ -18,7 +18,7 @@ docs-serve = { cmd = "pdoc pynw --math --edit-url pynw=https://github.com/chrisd
 
 [dependencies]
 python = ">=3.10"
-numpy = "*"
+numpy = ">=1.22"
 
 [feature.build.dependencies]
 pip = "*"
@@ -53,7 +53,7 @@ python = "3.10.*"
 python = "3.14.*"
 
 [feature.numpy-oldest.dependencies]
-numpy = "1.21.*"
+numpy = "1.22.*"
 
 [feature.numpy-latest.dependencies]
 numpy = "2.4.*"

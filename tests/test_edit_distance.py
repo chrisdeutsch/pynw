@@ -23,9 +23,9 @@ pytestmark = pytest.mark.hypothesis
 
 
 def char_score_matrix(s1: str, s2: str, match: float, mismatch: float):
-    return np.where(
-        np.array(list(s1))[:, None] == np.array(list(s2))[None, :], match, mismatch
-    )
+    a1 = np.array(list(s1), dtype="U1").reshape(-1, 1)
+    a2 = np.array(list(s2), dtype="U1").reshape(1, -1)
+    return np.where(a1 == a2, match, mismatch)
 
 
 def nw_score(
