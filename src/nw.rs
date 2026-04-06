@@ -34,7 +34,7 @@ pub(crate) enum EditOp {
     Delete = 2,
 }
 
-pub fn parse_editops<D: Dimension>(
+pub(crate) fn parse_editops<D: Dimension>(
     array: ArrayView<u8, D>,
 ) -> Result<Array<EditOp, D>, &'static str> {
     let dim = array.dim();
