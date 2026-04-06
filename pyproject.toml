@@ -75,3 +75,7 @@ convention = "numpy"
 
 [tool.mypy]
 strict = true
+
+[[tool.mypy.overrides]]
+module = "pynw._ops"
+warn_unused_ignores = false

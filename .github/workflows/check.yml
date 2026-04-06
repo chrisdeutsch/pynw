@@ -37,7 +37,7 @@ jobs:
       - name: cargo test
         run: pixi run -- cargo test
       - name: cargo clippy
-        run: pixi run -- cargo clippy --all-targets --all-features -Dwarnings
+        run: pixi run -- cargo clippy --all-targets --all-features -- -Dwarnings
 
   python:
     runs-on: ubuntu-latest
