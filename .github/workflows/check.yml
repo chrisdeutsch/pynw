@@ -35,9 +35,9 @@ jobs:
         with:
           cache: true
       - name: cargo test
-        run: pixi run cargo test
+        run: pixi run -- cargo test
       - name: cargo clippy
-        run: pixi run cargo clippy --all-targets --all-features -- -Dwarnings
+        run: pixi run -- cargo clippy --all-targets --all-features -Dwarnings
 
   python:
     runs-on: ubuntu-latest
@@ -52,7 +52,9 @@ jobs:
         with:
           environments: ${{ matrix.env }}
           cache: true
+      - name: build
+        run: pixi run -e ${{ matrix.env }} build
       - name: pytest
-        run: pixi run -e ${{ matrix.env }} test
+        run: pixi run -e ${{ matrix.env }} -- pytest
       - name: mypy
-        run: pixi run -e ${{ matrix.env }} mypy pynw
+        run: pixi run -e ${{ matrix.env }} -- mypy pynw
