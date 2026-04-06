@@ -1,4 +1,4 @@
-use pyo3::prelude::*;
+use pyo3::pymodule;
 
 mod nw;
 mod utils;
