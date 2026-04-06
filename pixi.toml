@@ -60,5 +60,5 @@ numpy = "2.4.*"
 
 [environments]
 default = ["build", "test", "lint", "docs"]
-py310-numpy-oldest = ["py310", "numpy-oldest", "build", "test"]
 py314-numpy-latest = ["py314", "numpy-latest", "build", "test"]
+py310-numpy-oldest = ["py310", "numpy-oldest", "build", "test"]
