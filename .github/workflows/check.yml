@@ -42,6 +42,7 @@ jobs:
   python:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         env: [py310-numpy-oldest, py314-numpy-latest]
     steps:
