@@ -24,10 +24,8 @@ jobs:
           cache: true
       - name: Formatting & linting (ruff, cargo fmt, markdownlint, actionlint)
         run: pixi run lint
-      - name: Static analysis (cargo clippy, mypy)
-        run: pixi run check
 
-  test-rust:
+  rust:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -38,8 +36,10 @@ jobs:
           cache: true
       - name: cargo test
         run: pixi run cargo test
+      - name: cargo clippy
+        run: pixi run cargo clippy --all-targets --all-features -- -Dwarnings
 
-  test-python:
+  python:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -54,3 +54,5 @@ jobs:
           cache: true
       - name: pytest
         run: pixi run -e ${{ matrix.env }} test
+      - name: mypy
+        run: pixi run -e ${{ matrix.env }} mypy pynw

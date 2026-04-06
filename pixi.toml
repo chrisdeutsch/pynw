@@ -34,9 +34,11 @@ rapidfuzz = "*"
 scipy = "*"
 inline-snapshot = "*"
 
+[feature.mypy.dependencies]
+mypy = "*"
+
 [feature.lint.dependencies]
 ruff = "*"
-mypy = "*"
 markdownlint-cli = "*"
 prettier = "*"
 actionlint = "*"
@@ -59,6 +61,6 @@ numpy = "1.22.*"
 numpy = "2.4.*"
 
 [environments]
-default = ["build", "test", "lint", "docs"]
-py314-numpy-latest = ["py314", "numpy-latest", "build", "test"]
-py310-numpy-oldest = ["py310", "numpy-oldest", "build", "test"]
+default = ["build", "test", "mypy", "lint", "docs"]
+py314-numpy-latest = ["py314", "numpy-latest", "build", "test", "mypy"]
+py310-numpy-oldest = ["py310", "numpy-oldest", "build", "test", "mypy"]
