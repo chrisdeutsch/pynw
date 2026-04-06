@@ -33,7 +33,6 @@ hypothesis = "*"
 rapidfuzz = "*"
 scipy = "*"
 inline-snapshot = "*"
-fastembed = "*"
 
 [feature.lint.dependencies]
 ruff = "*"
@@ -47,5 +46,19 @@ taplo = "*"
 [feature.docs.dependencies]
 pdoc = "*"
 
+[feature.py310.dependencies]
+python = "3.10.*"
+
+[feature.py314.dependencies]
+python = "3.14.*"
+
+[feature.numpy-oldest.dependencies]
+numpy = "1.21.*"
+
+[feature.numpy-latest.dependencies]
+numpy = "2.4.*"
+
 [environments]
 default = ["build", "test", "lint", "docs"]
+py310-numpy-oldest = ["py310", "numpy-oldest", "build", "test"]
+py314-numpy-latest = ["py314", "numpy-latest", "build", "test"]

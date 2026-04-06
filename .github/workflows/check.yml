@@ -27,7 +27,7 @@ jobs:
       - name: Static analysis (cargo clippy, mypy)
         run: pixi run check
 
-  test:
+  test-rust:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -38,5 +38,19 @@ jobs:
           cache: true
       - name: cargo test
         run: pixi run cargo test
+
+  test-python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [py310-numpy-oldest, py314-numpy-latest]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
+        with:
+          environments: ${{ matrix.env }}
+          cache: true
       - name: pytest
-        run: pixi run test
+        run: pixi run -e ${{ matrix.env }} test
