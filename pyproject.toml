@@ -9,7 +9,7 @@ authors = [{ name = "Christopher Deutsch", email = "hello@cdeutsch.org" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.21"]
+dependencies = ["numpy>=1.22"]
 keywords = [
   "needleman-wunsch",
   "sequence-alignment",
@@ -75,3 +75,7 @@ convention = "numpy"
 
 [tool.mypy]
 strict = true
+
+[[tool.mypy.overrides]]
+module = "pynw._ops"
+warn_unused_ignores = false
