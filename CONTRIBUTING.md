@@ -45,6 +45,15 @@ pixi run check            # static analysis (clippy, mypy)
 [Lefthook](https://github.com/evilmartians/lefthook) is configured to run
 formatting and linting checks automatically on commit and push.
 
+## Documentation
+
+To generate or preview API docs locally:
+
+```bash
+pixi run docs          # generate static HTML in site/
+pixi run docs-serve    # serve live docs in the browser
+```
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the

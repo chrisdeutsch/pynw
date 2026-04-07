@@ -31,17 +31,17 @@ def _exec_block(block: str, name: str, line_offset: int = 0) -> dict[str, Any]:
 
 QUICKSTART_EXPECTED_OUTPUT = snapshot("""\
 Score: 1.42
-  clever      sly
-  sneaky      -
-  fox         fox
-  leaped      jumped
-  -           across
+  clever      sly         (match)
+  sneaky      -           (delete)
+  fox         fox         (match)
+  leaped      jumped      (match)
+  -           across      (insert)
 """)
 
 
 def test_quickstart_example(repo_root, capsys):
     blocks = _extract_python_blocks((repo_root / "README.md").read_text())
-    block, start_line = blocks[0]
+    block, start_line = blocks[1]
     _exec_block(block, "README.md", start_line)
     assert capsys.readouterr().out == QUICKSTART_EXPECTED_OUTPUT
 
