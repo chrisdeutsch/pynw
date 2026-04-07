@@ -37,7 +37,7 @@ score, editops = needleman_wunsch(S, gap_penalty=-0.5)
 
 ## Features
 
-- **Fast:** Alignment runs in $O(nm)$ time; a `1000 x 1000` matrix takes <10 ms on modern CPUs.
+- **Fast:** Alignment runs in $\mathcal{O}(nm)$ time; a $1000 \times 1000$ matrix takes <10 ms on modern CPUs.
 - **NumPy-first:** Pass NumPy arrays directly, no conversion needed.
 - **Domain-agnostic:** Operates on a user-supplied similarity matrix.
 - **Asymmetric gaps:** Penalize inserts and deletes independently.
@@ -84,8 +84,8 @@ Using `pynw` involves three steps:
    elements were aligned, inserted, or deleted.
 
 The example below aligns two word sequences. The similarity matrix is built from
-cosine similarities of the [GloVe](https://nlp.stanford.edu/projects/glove/)
-word embeddings, letting semantically related words align even without an exact
+cosine similarities of [GloVe](https://nlp.stanford.edu/projects/glove/) word
+embeddings, letting semantically related words align even without an exact
 match:
 
 ```python
@@ -111,16 +111,16 @@ similarity_matrix = np.array([
 # Each gap deducts 0.5 from the total score; increase the penalty to force
 # more alignments, decrease it to allow more gaps
 score, editops = needleman_wunsch(similarity_matrix, gap_penalty=-0.5)
-src_idx, tgt_idx = alignment_indices(editops)
+source_indices, target_indices = alignment_indices(editops)
 
 # Reconstruct aligned sequences; masked positions are gaps
-aligned_src = np.ma.array(source).take(src_idx).filled("-")
-aligned_tgt = np.ma.array(target).take(tgt_idx).filled("-")
+aligned_source = np.ma.array(source).take(source_indices).filled("-")
+aligned_target = np.ma.array(target).take(target_indices).filled("-")
 
 LABELS = {EditOp.Align: "match", EditOp.Delete: "delete", EditOp.Insert: "insert"}
 
 print(f"Score: {round(score, 2)}")
-for op, s, t in zip(editops, aligned_src, aligned_tgt):
+for op, s, t in zip(editops, aligned_source, aligned_target):
     print(f"  {s:10s}  {t:10s}  ({LABELS[op]})")
 ```
 
@@ -141,9 +141,10 @@ Score: 1.42
 Use `needleman_wunsch` when you need the actual alignment, and
 `needleman_wunsch_score` when you only need the score.
 
-`pynw` takes a precomputed `(n, m)` similarity matrix rather than a scoring
-callback. This lets the alignment run entirely in Rust and lets you build
-scores with vectorized NumPy, at the cost of `O(nm)` memory for the matrix.
+`pynw` takes a precomputed $n \times m$ similarity matrix rather than a scoring
+callback. This allows the alignment to run entirely in native code and lets you
+build scores using vectorized NumPy operations, at the cost of $\mathcal{O}(nm)$
+memory for the matrix.
 
 ### Score and alignment: `needleman_wunsch`
 
@@ -195,35 +196,36 @@ markers:
 ```python
 from pynw import alignment_indices
 
-src_idx, tgt_idx = alignment_indices(editops)
+source_indices, target_indices = alignment_indices(editops)
 
 source = np.ma.array(["the", "quick", "fox"])
 target = np.ma.array(["the", "slow", "red", "fox"])
 
-aligned_src = source.take(src_idx).filled("-")
-aligned_tgt = target.take(tgt_idx).filled("-")
-# aligned_src: ['the', 'quick', '-',   'fox']
-# aligned_tgt: ['the', 'slow',  'red', 'fox']
+aligned_source = source.take(source_indices).filled("-")
+aligned_target = target.take(target_indices).filled("-")
+# aligned_source: ['the', 'quick', '-',   'fox']
+# aligned_target: ['the', 'slow',  'red', 'fox']
 ```
 
-Iterating over a masked array yields `np.ma.masked` at gap positions, so you
-can branch on the editop without explicit mask checks:
+Iterating over a masked array yields
+[`np.ma.masked`](https://numpy.org/doc/stable/reference/maskedarray.baseclass.html#numpy.ma.masked)
+at gap positions, so you can branch on the editop without explicit mask checks:
 
 ```python
-for op, s, t in zip(editops, src_idx, tgt_idx):
+for op, src, tgt in zip(editops, source_indices, target_indices):
     if op == EditOp.Align:
-        print(f"  {source[s]}")
+        print(f"  {source[src]}")
     elif op == EditOp.Delete:
-        print(f"- {source[s]}")
+        print(f"- {source[src]}")
     elif op == EditOp.Insert:
-        print(f"+ {target[t]}")
+        print(f"+ {target[tgt]}")
 ```
 
 ### Score only: `needleman_wunsch_score`
 
 Use `needleman_wunsch_score` when you only need the alignment score, for
 example when ranking or filtering many sequence pairs. It skips the traceback
-entirely, using O(m) memory instead of O(nm):
+entirely, using $\mathcal{O}(m)$ memory instead of $\mathcal{O}(nm)$:
 
 ```python
 from pynw import needleman_wunsch_score
@@ -250,11 +252,6 @@ For Hamming distance, strings must have equal length.
 Full API documentation is available at
 [chrisdeutsch.github.io/pynw](https://chrisdeutsch.github.io/pynw/pynw.html).
 
-## Development
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, build
-commands, and pre-commit hooks.
-
 ## Related Projects
 
 - [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz):
@@ -275,7 +272,7 @@ commands, and pre-commit hooks.
 
 Open a [GitHub issue](https://github.com/chrisdeutsch/pynw/issues) for bug
 reports, questions, or feature requests. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on submitting changes.
+[CONTRIBUTING](CONTRIBUTING.md) for guidelines on submitting changes.
 
 ## License
 
