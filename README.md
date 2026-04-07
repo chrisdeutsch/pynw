@@ -3,37 +3,75 @@
 [![Check](https://github.com/chrisdeutsch/pynw/actions/workflows/check.yml/badge.svg)](https://github.com/chrisdeutsch/pynw/actions/workflows/check.yml)
 [![Build](https://github.com/chrisdeutsch/pynw/actions/workflows/build.yml/badge.svg)](https://github.com/chrisdeutsch/pynw/actions/workflows/build.yml)
 [![PyPI](https://img.shields.io/pypi/v/pynw)](https://pypi.org/project/pynw/)
+[![Python](https://img.shields.io/pypi/pyversions/pynw)](https://pypi.org/project/pynw/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Rust-accelerated [Needleman-Wunsch](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm)
-global sequence alignment for user-supplied similarity matrices. Python bindings
-are built with [PyO3](https://pyo3.rs).
+`pynw` aligns two ordered sequences element-by-element using any pairwise
+similarity matrix you supply. Think of it as a generalised diff for arbitrary
+ordered collections: words, embeddings, tokens, or any objects where you define
+how well each pair of elements matches.
 
-Align two ordered sequences given any precomputed pairwise similarity matrix.
-Unlike string-distance or bioinformatics libraries, which are designed around
-specific alphabets and scoring rules, `pynw` accepts whatever scores you
-provide: cosine similarity of embeddings, model outputs, or distance metrics.
+Unlike string-distance or bioinformatics libraries that assume a fixed alphabet
+and built-in scoring scheme, `pynw` delegates scoring entirely to the user, so
+any pairwise metric works: cosine similarity of embeddings, model outputs,
+learned distances, or domain-specific rules. The
+[Needleman-Wunsch](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm)
+global sequence alignment algorithm provides the underpinning for `pynw`. It is
+implemented in Rust with Python bindings built using [PyO3](https://pyo3.rs).
+
+```python
+import numpy as np
+from pynw import needleman_wunsch
+
+# Pairwise similarity matrix between your two sequences (source × target)
+S = np.array([
+    [1.0, 0.1],
+    [0.1, 0.1],
+    [0.1, 1.0],
+])
+
+score, editops = needleman_wunsch(S, gap_penalty=-0.5)
+# score: 1.5
+# editops: [EditOp.Align, EditOp.Delete, EditOp.Align]
+```
 
 ## Features
 
-- **Fast:** Alignment runs in $O(nm)$ time; a `1000×1000` matrix takes <10 ms on modern CPUs.
+- **Fast:** Alignment runs in $O(nm)$ time; a `1000 x 1000` matrix takes <10 ms on modern CPUs.
 - **NumPy-first:** Pass NumPy arrays directly, no conversion needed.
-- **Domain-agnostic:** Operates on a precomputed similarity matrix; the scoring function is up to you.
+- **Domain-agnostic:** Operates on a user-supplied similarity matrix.
 - **Asymmetric gaps:** Penalize inserts and deletes independently.
+
+## When to Use pynw
+
+Reach for `pynw` when you need global alignment of two ordered sequences and
+the notion of similarity is specific to your domain: aligning sentences from
+two translations using embedding similarities, matching token streams emitted
+by different tokenizers, comparing event logs with custom match rules, or any
+case where precomputing scores in NumPy is natural.
+
+If your problem fits a standard string metric (Levenshtein, Jaro-Winkler, and
+friends), [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz) is faster and more
+featureful. If you are aligning biological sequences, use a bioinformatics
+library such as
+[BioPython](https://biopython.org/docs/dev/Tutorial/chapter_align.html). If
+ordering does not matter and you want optimal one-to-one assignment, see
+[`scipy.optimize.linear_sum_assignment`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html).
+See [Related Projects](#related-projects) for more.
 
 ## Installation
 
-Requires Python 3.10+ and NumPy 1.22+. Prebuilt wheels for Linux, macOS, and
-Windows are published on PyPI.
+Prebuilt wheels for Linux, macOS, and Windows are published on PyPI:
 
 ```sh
 pip install pynw
 ```
 
-On platforms without a prebuilt wheel, pip will build from the source
-distribution. This requires a [Rust toolchain](https://rustup.rs/) (1.85+).
+`pynw` requires Python 3.10+ and NumPy 1.22+. On platforms without a prebuilt
+wheel, pip will build from the source distribution; this requires a
+[Rust toolchain](https://rustup.rs/) (1.85+).
 
-## Quick start
+## Quick Start
 
 Using `pynw` involves three steps:
 
@@ -46,12 +84,13 @@ Using `pynw` involves three steps:
    elements were aligned, inserted, or deleted.
 
 The example below aligns two word sequences. The similarity matrix is built from
-[GloVe](https://nlp.stanford.edu/projects/glove/) cosine similarities, letting
-semantically related words align even without an exact match:
+cosine similarities of the [GloVe](https://nlp.stanford.edu/projects/glove/)
+word embeddings, letting semantically related words align even without an exact
+match:
 
 ```python
 import numpy as np
-from pynw import needleman_wunsch, alignment_indices
+from pynw import EditOp, needleman_wunsch, alignment_indices
 
 source = np.array(
     ["clever", "sneaky", "fox", "leaped"]
@@ -78,41 +117,39 @@ src_idx, tgt_idx = alignment_indices(editops)
 aligned_src = np.ma.array(source).take(src_idx).filled("-")
 aligned_tgt = np.ma.array(target).take(tgt_idx).filled("-")
 
-print(f"Score: {round(score, 2)}")
-for s, t in zip(aligned_src, aligned_tgt):
-    print(f"  {s:10s}  {t}")
+LABELS = {EditOp.Align: "match", EditOp.Delete: "delete", EditOp.Insert: "insert"}
 
-# Score: 1.42
-#   clever     sly       (semantic match)
-#   sneaky     -         (deleted)
-#   fox        fox       (exact match)
-#   leaped     jumped    (semantic match)
-#   -          across    (inserted)
+print(f"Score: {round(score, 2)}")
+for op, s, t in zip(editops, aligned_src, aligned_tgt):
+    print(f"  {s:10s}  {t:10s}  ({LABELS[op]})")
+```
+
+Output:
+
+```text
+Score: 1.42
+  clever      sly         (match)
+  sneaky      -           (delete)
+  fox         fox         (match)
+  leaped      jumped      (match)
+  -           across      (insert)
 ```
 
 ## User Guide
 
 `pynw` exposes two alignment functions and a helper for interpreting results.
-Which function you need depends on whether you need just the score or the full
-alignment.
+Use `needleman_wunsch` when you need the actual alignment, and
+`needleman_wunsch_score` when you only need the score.
 
-### Score only: `needleman_wunsch_score`
-
-Use `needleman_wunsch_score` when you only need the alignment score, for
-example when ranking or filtering many sequence pairs. It skips the traceback
-entirely, using O(m) memory instead of O(nm):
-
-```python
-from pynw import needleman_wunsch_score
-
-score = needleman_wunsch_score(similarity_matrix)
-```
+`pynw` takes a precomputed `(n, m)` similarity matrix rather than a scoring
+callback. This lets the alignment run entirely in Rust and lets you build
+scores with vectorized NumPy, at the cost of `O(nm)` memory for the matrix.
 
 ### Score and alignment: `needleman_wunsch`
 
-Use `needleman_wunsch` when you need to know _how_ the sequences were aligned.
-It returns the optimal score along with an array of edit operations (`editops`).
-Each element in the editops array is one of three `EditOp` values:
+`needleman_wunsch` returns the optimal score along with an array of edit
+operations (`editops`). Each element in the editops array is one of three
+`EditOp` values:
 
 - `EditOp.Align`: a source element is matched with a target element.
 - `EditOp.Delete`: a source element is consumed with no matching target element
@@ -132,24 +169,34 @@ n_inserted = np.sum(editops == EditOp.Insert)
 n_deleted = np.sum(editops == EditOp.Delete)
 ```
 
+When multiple alignments achieve the same optimal score, `pynw` breaks ties
+deterministically: `Align > Delete > Insert`.
+
+By default, `gap_penalty` applies equally to insertions and deletions. Pass
+`insert_penalty` and/or `delete_penalty` to penalize them independently, which
+is useful when the cost of missing a source element differs from the cost of
+introducing a spurious target element:
+
+```python
+score, editops = needleman_wunsch(
+    similarity_matrix,
+    insert_penalty=-0.3,
+    delete_penalty=-0.7,
+)
+```
+
 ### Reconstructing the alignment: `alignment_indices`
 
-Use `alignment_indices` when you need to map alignment positions back to the
-original sequences. It converts the editops array into two masked index arrays: one
-for the source, one for the target. Each array has one entry per alignment
-position. Positions where the corresponding sequence has a gap are masked.
+`alignment_indices` converts an editops array into two masked index arrays
+(one per sequence) with one entry per alignment position. Gap positions are
+masked, so `take(...).filled("-")` reconstructs aligned sequences with gap
+markers:
 
 ```python
 from pynw import alignment_indices
 
 src_idx, tgt_idx = alignment_indices(editops)
-```
 
-Because the indices are masked arrays, `take` propagates the mask and `filled`
-substitutes a value at gap positions. This makes it easy to reconstruct aligned
-sequences with gap markers:
-
-```python
 source = np.ma.array(["the", "quick", "fox"])
 target = np.ma.array(["the", "slow", "red", "fox"])
 
@@ -159,11 +206,8 @@ aligned_tgt = target.take(tgt_idx).filled("-")
 # aligned_tgt: ['the', 'slow',  'red', 'fox']
 ```
 
-When iterating over a masked array, masked positions yield the `np.ma.masked`
-sentinel instead of an integer. This means you can iterate over `editops` and the
-index arrays together without checking masks explicitly. In the diff example
-below, `s` is masked at Insert positions and `t` is masked at Delete positions,
-so only the valid index is used in each branch:
+Iterating over a masked array yields `np.ma.masked` at gap positions, so you
+can branch on the editop without explicit mask checks:
 
 ```python
 for op, s, t in zip(editops, src_idx, tgt_idx):
@@ -175,47 +219,19 @@ for op, s, t in zip(editops, src_idx, tgt_idx):
         print(f"+ {target[t]}")
 ```
 
-### Asymmetric gap penalties
+### Score only: `needleman_wunsch_score`
 
-By default, `gap_penalty` applies equally to insertions and deletions. To
-penalize them independently, pass `insert_penalty` and/or `delete_penalty`:
+Use `needleman_wunsch_score` when you only need the alignment score, for
+example when ranking or filtering many sequence pairs. It skips the traceback
+entirely, using O(m) memory instead of O(nm):
 
 ```python
-score, editops = needleman_wunsch(
-    similarity_matrix,
-    insert_penalty=-0.3,
-    delete_penalty=-0.7,
-)
+from pynw import needleman_wunsch_score
+
+score = needleman_wunsch_score(similarity_matrix)
 ```
 
-When set, these override `gap_penalty` for the corresponding direction. This is
-useful when the cost of missing a source element differs from the cost of
-introducing a spurious target element.
-
-## Details
-
-### Precomputed similarity matrix
-
-`pynw` takes a precomputed `(n, m)` similarity matrix rather than a scoring
-function. This means the entire alignment runs in compiled Rust code with no
-Python callbacks, and you can build scores with vectorized NumPy operations
-rather than element-wise Python loops.
-
-The trade-off is that you must allocate the full matrix up front, which uses
-$O(nm)$ memory even when the scoring rule could be expressed more compactly.
-
-### Scoring
-
-The total alignment score is the sum of similarity-matrix entries for matched
-positions and gap penalties for insertions/deletions. Gap penalties are
-typically negative. By default a single `gap_penalty` applies to both
-directions; set `insert_penalty` and/or `delete_penalty` to penalise them
-independently.
-
-When multiple alignments achieve the same optimal score, `pynw` breaks ties
-deterministically: `Align > Delete > Insert`.
-
-### Edit-distance parameterizations
+## Reproducing Classical Edit Distances
 
 Needleman-Wunsch can reproduce common metrics with the right similarity-matrix
 values and gap penalty:
@@ -233,31 +249,13 @@ For Hamming distance, strings must have equal length.
 
 Full API documentation is available at
 [chrisdeutsch.github.io/pynw](https://chrisdeutsch.github.io/pynw/pynw.html).
-To browse locally:
-
-```sh
-pixi run docs          # generate static HTML in site/
-pixi run docs-serve    # serve live docs in the browser
-```
 
 ## Development
 
-This repository uses [pixi](https://pixi.sh) for development:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, build
+commands, and pre-commit hooks.
 
-```sh
-pixi install
-pixi run build            # build the Rust extension
-pixi run test             # run deterministic tests
-pixi run lint             # run all pre-commit checks (ruff, cargo fmt, prettier, markdownlint, taplo, actionlint)
-pixi run check            # run all pre-push checks (cargo clippy, mypy)
-pixi run docs             # generate API docs in site/
-pixi run docs-serve       # serve API docs in the browser
-```
-
-Linting and formatting are managed by [lefthook](https://github.com/evilmartians/lefthook)
-and run automatically as git hooks.
-
-## Related projects
+## Related Projects
 
 - [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz):
   Highly optimized string distances (Levenshtein, Jaro-Winkler, etc.) with
@@ -272,6 +270,12 @@ and run automatically as git hooks.
 - [BioPython `Bio.Align.PairwiseAligner`](https://biopython.org/docs/dev/Tutorial/chapter_align.html):
   Needleman-Wunsch/Smith-Waterman for biological sequences with
   alphabet-based substitution matrices (built-in and custom).
+
+## Contributing & Support
+
+Open a [GitHub issue](https://github.com/chrisdeutsch/pynw/issues) for bug
+reports, questions, or feature requests. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on submitting changes.
 
 ## License
 
