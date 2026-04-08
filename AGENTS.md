@@ -7,8 +7,8 @@ scoring) belongs in the caller. Rust core (PyO3) + Python bindings.
 ## Architecture
 
 - `src/` — Rust DP implementations + PyO3 bindings (`lib.rs` exposes to Python)
-- `pynw/_native.pyi` — type stubs (keep in sync with Rust doc comments in `src/lib.rs`)
-- `pynw/__init__.py` — public API re-exports; update `__all__` when adding functions
+- `python/pynw/_native.pyi` — type stubs (keep in sync with Rust doc comments in `src/lib.rs`)
+- `python/pynw/__init__.py` — public API re-exports; update `__all__` when adding functions
 - `tests/` — pytest suite
 
 Most code should be implemented in the Rust crate. The Python library only

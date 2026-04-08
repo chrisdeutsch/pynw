@@ -45,8 +45,8 @@ Repository = "https://github.com/chrisdeutsch/pynw"
 Issues = "https://github.com/chrisdeutsch/pynw/issues"
 
 [tool.maturin]
+python-source = "python"
 module-name = "pynw._native"
-artifacts = ["pynw/py.typed"]
 
 [tool.pytest.ini_options]
 markers = [
@@ -55,6 +55,9 @@ markers = [
   "slow: slow tests such as embedding models (run with: pytest -m slow)",
 ]
 addopts = "--doctest-modules -m 'not benchmark and not slow'"
+
+[tool.ruff]
+src = ["python"]
 
 [tool.ruff.lint]
 select = [
@@ -68,7 +71,10 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
-"pynw/__init__.py" = ["D205", "D400"] # docstring is an rST include directive
+"python/pynw/__init__.py" = [
+  "D205",
+  "D400",
+] # docstring is an rST include directive
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

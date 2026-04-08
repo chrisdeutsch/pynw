@@ -9,10 +9,10 @@ build = "maturin develop --release"
 test = { cmd = "pytest", depends-on = ["build"] }
 lint = "lefthook run pre-commit --all-files --fail-on-changes"
 check = "lefthook run pre-push --all-files"
-docs = { cmd = "pdoc pynw --math --edit-url pynw=https://github.com/chrisdeutsch/pynw/blob/main/pynw/ -o site", depends-on = [
+docs = { cmd = "pdoc pynw --math --edit-url pynw=https://github.com/chrisdeutsch/pynw/blob/main/python/pynw/ -o site", depends-on = [
   "build",
 ] }
-docs-serve = { cmd = "pdoc pynw --math --edit-url pynw=https://github.com/chrisdeutsch/pynw/blob/main/pynw/", depends-on = [
+docs-serve = { cmd = "pdoc pynw --math --edit-url pynw=https://github.com/chrisdeutsch/pynw/blob/main/python/pynw/", depends-on = [
   "build",
 ] }
 
