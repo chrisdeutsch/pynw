@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-
 from pynw import needleman_wunsch, needleman_wunsch_score
 from pynw._ops import EditOp
 
