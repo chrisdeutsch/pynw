@@ -179,11 +179,10 @@ is useful when the cost of missing a source element differs from the cost of
 introducing a spurious target element:
 
 ```python
-# insert uses -0.3; delete falls back to gap_penalty (-0.5)
 score, editops = needleman_wunsch(
     similarity_matrix,
-    gap_penalty=-0.5,
     insert_penalty=-0.3,
+    delete_penalty=-0.5,
 )
 ```
 
