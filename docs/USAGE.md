@@ -29,7 +29,7 @@ target_seq = np.array([
 ])
 
 score = cdist(source_seq, target_seq, scorer=ratio) / 100
-_, ops = needleman_wunsch(score)
+_, ops = needleman_wunsch(score, gap_penalty=-1.0)
 source_idx, target_idx = alignment_indices(ops)
 
 source_aligned = np.ma.array(source_seq).take(source_idx)

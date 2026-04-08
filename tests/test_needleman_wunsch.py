@@ -8,7 +8,7 @@ from pynw._ops import EditOp
 
 
 def test_return_types() -> None:
-    score, ops = needleman_wunsch(np.eye(3, dtype=np.float64))
+    score, ops = needleman_wunsch(np.eye(3, dtype=np.float64), gap_penalty=-1.0)
     assert isinstance(score, float)
     assert isinstance(ops, np.ndarray)
     assert ops.dtype == np.uint8
@@ -18,7 +18,7 @@ def test_return_types() -> None:
 
 
 def test_score_return_type() -> None:
-    score = needleman_wunsch_score(np.eye(3, dtype=np.float64))
+    score = needleman_wunsch_score(np.eye(3, dtype=np.float64), gap_penalty=-1.0)
     assert isinstance(score, float)
     assert score == 3.0
 
@@ -35,7 +35,7 @@ class TestInputValidation:
     )
     def test_rejects_wrong_dim(self, func, similarity_matrix):
         with pytest.raises(ValueError, match="2-dimensional"):
-            func(similarity_matrix)
+            func(similarity_matrix, gap_penalty=-1.0)
 
     @pytest.mark.parametrize(
         "similarity_matrix, expected_score",
@@ -73,7 +73,7 @@ class TestInputValidation:
         ],
     )
     def test_casts(self, func, similarity_matrix, expected_score) -> None:
-        result = func(similarity_matrix)
+        result = func(similarity_matrix, gap_penalty=-1.0)
         score = result[0] if isinstance(result, tuple) else result
         assert isinstance(score, float)
         assert score == expected_score
@@ -81,12 +81,21 @@ class TestInputValidation:
     def test_rejects_nan_in_matrix(self, func) -> None:
         sm = np.array([[1.0, np.nan], [0.0, 1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            func(sm)
+            func(sm, gap_penalty=-1.0)
 
     def test_rejects_inf_in_matrix(self, func) -> None:
         sm = np.array([[1.0, np.inf], [0.0, 1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
+            func(sm, gap_penalty=-1.0)
+
+    def test_rejects_missing_penalties(self, func) -> None:
+        sm = np.array([[1.0]])
+        with pytest.raises(ValueError, match="gap_penalty"):
             func(sm)
+        with pytest.raises(ValueError, match="gap_penalty"):
+            func(sm, insert_penalty=-1.0)
+        with pytest.raises(ValueError, match="gap_penalty"):
+            func(sm, delete_penalty=-1.0)
 
     def test_rejects_nan_gap_penalty(self, func) -> None:
         sm = np.array([[1.0]])
@@ -96,12 +105,12 @@ class TestInputValidation:
     def test_rejects_inf_insert_penalty(self, func) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            func(sm, insert_penalty=float("inf"))
+            func(sm, gap_penalty=-1.0, insert_penalty=float("inf"))
 
     def test_rejects_inf_delete_penalty(self, func) -> None:
         sm = np.array([[1.0]])
         with pytest.raises(ValueError, match=r"non-finite"):
-            func(sm, delete_penalty=float("inf"))
+            func(sm, gap_penalty=-1.0, delete_penalty=float("inf"))
 
 
 class TestEmptyAndDegenerateMatrices:
@@ -114,12 +123,12 @@ class TestEmptyAndDegenerateMatrices:
         ],
     )
     def test_empty_dim(self, similarity_matrix, expected_score, expected_ops) -> None:
-        score, ops = needleman_wunsch(similarity_matrix)
+        score, ops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
         assert score == expected_score
         np.testing.assert_equal(ops, expected_ops)
 
     def test_1x1(self) -> None:
-        score, ops = needleman_wunsch([[5.0]])
+        score, ops = needleman_wunsch([[5.0]], gap_penalty=-1.0)
         assert score == 5.0
         np.testing.assert_equal(ops, [EditOp.Align])
 
@@ -163,7 +172,7 @@ class TestEmptyAndDegenerateMatrices:
     ],
 )
 def test_rectangular_matrices(matrix, expected_score, expected_ops) -> None:
-    score, ops = needleman_wunsch(matrix)
+    score, ops = needleman_wunsch(matrix, gap_penalty=-1.0)
     assert score == expected_score
     np.testing.assert_equal(ops, expected_ops)
 
@@ -236,7 +245,7 @@ def test_tie_breaking(matrix, expected_ops) -> None:
     ],
 )
 def test_special_matrices(matrix, expected_score, expected_ops) -> None:
-    score, ops = needleman_wunsch(matrix)
+    score, ops = needleman_wunsch(matrix, gap_penalty=-1.0)
     assert score == expected_score
     np.testing.assert_equal(ops, expected_ops)
 

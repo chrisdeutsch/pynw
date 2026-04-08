@@ -2,6 +2,8 @@
 # A copy exists as a Rust doc comment in src/lib.rs for runtime `help()`.
 # Keep both copies in sync.
 
+from typing import overload
+
 import numpy as np
 import numpy.typing as npt
 
@@ -9,12 +11,13 @@ OP_ALIGN: int
 OP_INSERT: int
 OP_DELETE: int
 
+@overload
 def needleman_wunsch(
     similarity_matrix: npt.ArrayLike,
     *,
-    gap_penalty: float = -1.0,
-    insert_penalty: float | None = None,
-    delete_penalty: float | None = None,
+    gap_penalty: float,
+    insert_penalty: float | None = ...,
+    delete_penalty: float | None = ...,
 ) -> tuple[float, npt.NDArray[np.uint8]]:
     """Align two ordered sequences given a precomputed similarity matrix.
 
@@ -27,10 +30,11 @@ def needleman_wunsch(
         ``similarity_matrix[i, j]`` is the similarity score for aligning
         element *i* of the source sequence with element *j* of the target
         sequence.
-    gap_penalty : float, default -1.0
-        Penalty applied when a gap is inserted in either sequence.
-        Use ``insert_penalty`` or ``delete_penalty`` to set them
-        independently.
+    gap_penalty : float, optional
+        Penalty applied when a gap is inserted in either sequence, used as
+        fallback for ``insert_penalty`` and ``delete_penalty``.  Either
+        ``gap_penalty`` or both ``insert_penalty`` and ``delete_penalty``
+        must be provided.
     insert_penalty : float, optional
         Penalty for advancing the target sequence without consuming a source
         element (gap in source).  Defaults to ``gap_penalty``.
@@ -41,8 +45,9 @@ def needleman_wunsch(
     Raises
     ------
     ValueError
-        If ``similarity_matrix`` is not 2-dimensional, or if any value in
-        ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
+        If ``similarity_matrix`` is not 2-dimensional, if any value in
+        ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``,
+        or if the resolved insert or delete penalty is unspecified.
 
     Returns
     -------
@@ -82,12 +87,20 @@ def needleman_wunsch(
     """
     ...
 
+@overload
+def needleman_wunsch(
+    similarity_matrix: npt.ArrayLike,
+    *,
+    insert_penalty: float,
+    delete_penalty: float,
+) -> tuple[float, npt.NDArray[np.uint8]]: ...
+@overload
 def needleman_wunsch_score(
     similarity_matrix: npt.ArrayLike,
     *,
-    gap_penalty: float = -1.0,
-    insert_penalty: float | None = None,
-    delete_penalty: float | None = None,
+    gap_penalty: float,
+    insert_penalty: float | None = ...,
+    delete_penalty: float | None = ...,
 ) -> float:
     """Compute the optimal Needleman-Wunsch alignment score without the traceback.
 
@@ -102,10 +115,11 @@ def needleman_wunsch_score(
         ``similarity_matrix[i, j]`` is the similarity score for aligning
         element *i* of the source sequence with element *j* of the target
         sequence.
-    gap_penalty : float, default -1.0
-        Penalty applied when a gap is inserted in either sequence.
-        Use ``insert_penalty`` or ``delete_penalty`` to set them
-        independently.
+    gap_penalty : float, optional
+        Penalty applied when a gap is inserted in either sequence, used as
+        fallback for ``insert_penalty`` and ``delete_penalty``.  Either
+        ``gap_penalty`` or both ``insert_penalty`` and ``delete_penalty``
+        must be provided.
     insert_penalty : float, optional
         Penalty for advancing the target sequence without consuming a source
         element (gap in source).  Defaults to ``gap_penalty``.
@@ -116,8 +130,9 @@ def needleman_wunsch_score(
     Raises
     ------
     ValueError
-        If ``similarity_matrix`` is not 2-dimensional, or if any value in
-        ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
+        If ``similarity_matrix`` is not 2-dimensional, if any value in
+        ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``,
+        or if the resolved insert or delete penalty is unspecified.
 
     Returns
     -------
@@ -139,6 +154,13 @@ def needleman_wunsch_score(
     """
     ...
 
+@overload
+def needleman_wunsch_score(
+    similarity_matrix: npt.ArrayLike,
+    *,
+    insert_penalty: float,
+    delete_penalty: float,
+) -> float: ...
 def alignment_indices(
     editops: npt.ArrayLike,
 ) -> tuple[
