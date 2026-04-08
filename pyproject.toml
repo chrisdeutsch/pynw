@@ -71,6 +71,9 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
+"**/*.pyi" = [
+  "D418",
+] # @overload stubs can't carry docstrings per mypy, so docstring goes on first overload
 "python/pynw/__init__.py" = [
   "D205",
   "D400",
