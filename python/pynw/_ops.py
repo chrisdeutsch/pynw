@@ -58,23 +58,6 @@ def alignment_indices(
         If ``editops`` cannot be converted to a 1-D ``uint8`` array, if any
         element is out of the ``uint8`` range, or if any element is not a
         valid ``EditOp`` discriminant.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from pynw import needleman_wunsch, alignment_indices
-    >>> source_seq = list("GAT")
-    >>> target_seq = list("GT")
-    >>> sm = np.where(
-    ...     np.array(source_seq)[:, None] == np.array(target_seq)[None, :],
-    ...     1.0, -1.0,
-    ... )
-    >>> _, editops = needleman_wunsch(sm, gap_penalty=-1.0)
-    >>> src, tgt = alignment_indices(editops)
-    >>> src.tolist()
-    [0, 1, 2]
-    >>> tgt.tolist()
-    [0, None, 1]
     """
     src_idx, src_mask, tgt_idx, tgt_mask = _alignment_indices(editops)
     # np.ma.array is untyped before numpy 2.4

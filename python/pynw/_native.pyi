@@ -58,24 +58,6 @@ def needleman_wunsch(
         is of type ``EditOp``.  Use
         ``alignment_indices`` to reconstruct source and target index arrays.
 
-    Examples
-    --------
-    Align two DNA sequences using a simple match/mismatch scoring scheme:
-
-    >>> import numpy as np
-    >>> from pynw import alignment_indices
-    >>> seq1 = np.array(list("GATTACA"))
-    >>> seq2 = np.array(list("GCATGCA"))
-    >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
-    >>> score, editops = needleman_wunsch(sm, gap_penalty=-1.0)
-    >>> score
-    2.0
-    >>> src_idx, tgt_idx = alignment_indices(editops)
-    >>> "".join(np.ma.array(seq1).take(src_idx).filled("-"))
-    'G-ATTACA'
-    >>> "".join(np.ma.array(seq2).take(tgt_idx).filled("-"))
-    'GCA-TGCA'
-
     Notes
     -----
     When multiple alignments achieve the same optimal score, ties are
@@ -138,15 +120,6 @@ def needleman_wunsch_score(
     -------
     score : float
         The optimal alignment score.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> seq1 = np.array(list("GATTACA"))
-    >>> seq2 = np.array(list("GCATGCA"))
-    >>> sm = np.where(seq1[:, None] == seq2[None, :], 1.0, -1.0)
-    >>> needleman_wunsch_score(sm, gap_penalty=-1.0)
-    2.0
 
     Notes
     -----
