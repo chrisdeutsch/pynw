@@ -58,4 +58,4 @@ jobs:
       - name: pytest
         run: pixi run -e ${{ matrix.env }} -- pytest
       - name: mypy
-        run: pixi run -e ${{ matrix.env }} -- mypy pynw
+        run: pixi run -e ${{ matrix.env }} -- mypy python/pynw
