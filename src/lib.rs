@@ -32,10 +32,11 @@ mod pynw_native {
     ///     ``similarity_matrix[i, j]`` is the similarity score for aligning
     ///     element *i* of the source sequence with element *j* of the target
     ///     sequence.
-    /// gap_penalty : float, default -1.0
-    ///     Penalty applied when a gap is inserted in either sequence.
-    ///     Use ``insert_penalty`` or ``delete_penalty`` to set them
-    ///     independently.
+    /// gap_penalty : float, optional
+    ///     Penalty applied when a gap is inserted in either sequence, used as
+    ///     fallback for ``insert_penalty`` and ``delete_penalty``.  Either
+    ///     ``gap_penalty`` or both ``insert_penalty`` and ``delete_penalty``
+    ///     must be provided.
     /// insert_penalty : float, optional
     ///     Penalty for advancing the target sequence without consuming a source
     ///     element (gap in source).  Defaults to ``gap_penalty``.
@@ -45,8 +46,9 @@ mod pynw_native {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``similarity_matrix`` is not 2-dimensional, or if any value in
-    ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
+    ///     If ``similarity_matrix`` is not 2-dimensional, if any value in
+    ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``,
+    ///     or if the resolved insert or delete penalty is unspecified.
     ///
     /// Returns
     /// -------
@@ -86,13 +88,13 @@ mod pynw_native {
     ///
     #[pyfunction]
     #[pyo3(
-        signature = (similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
-        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None)",
+        signature = (similarity_matrix, *, gap_penalty=None, insert_penalty=None, delete_penalty=None),
+        text_signature = "(similarity_matrix, *, gap_penalty=None, insert_penalty=None, delete_penalty=None)",
     )]
     fn needleman_wunsch<'py>(
         py: Python<'py>,
         similarity_matrix: Bound<'py, PyAny>,
-        gap_penalty: f64,
+        gap_penalty: Option<f64>,
         insert_penalty: Option<f64>,
         delete_penalty: Option<f64>,
     ) -> PyResult<(f64, Bound<'py, PyArray1<u8>>)> {
@@ -103,8 +105,16 @@ mod pynw_native {
         })?;
         let similarity_matrix = pyarray.as_array();
 
-        let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
-        let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
+        let insert_penalty = insert_penalty.or(gap_penalty).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(
+                "provide gap_penalty, or provide both insert_penalty and delete_penalty",
+            )
+        })?;
+        let delete_penalty = delete_penalty.or(gap_penalty).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(
+                "provide gap_penalty, or provide both insert_penalty and delete_penalty",
+            )
+        })?;
 
         validate_inputs(similarity_matrix, insert_penalty, delete_penalty)?;
 
@@ -130,10 +140,11 @@ mod pynw_native {
     ///     ``similarity_matrix[i, j]`` is the similarity score for aligning
     ///     element *i* of the source sequence with element *j* of the target
     ///     sequence.
-    /// gap_penalty : float, default -1.0
-    ///     Penalty applied when a gap is inserted in either sequence.
-    ///     Use ``insert_penalty`` or ``delete_penalty`` to set them
-    ///     independently.
+    /// gap_penalty : float, optional
+    ///     Penalty applied when a gap is inserted in either sequence, used as
+    ///     fallback for ``insert_penalty`` and ``delete_penalty``.  Either
+    ///     ``gap_penalty`` or both ``insert_penalty`` and ``delete_penalty``
+    ///     must be provided.
     /// insert_penalty : float, optional
     ///     Penalty for advancing the target sequence without consuming a source
     ///     element (gap in source).  Defaults to ``gap_penalty``.
@@ -144,8 +155,9 @@ mod pynw_native {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``similarity_matrix`` is not 2-dimensional, or if any value in
-    ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``.
+    ///     If ``similarity_matrix`` is not 2-dimensional, if any value in
+    ///     ``similarity_matrix`` or the gap penalties is ``NaN`` or ``Inf``,
+    ///     or if the resolved insert or delete penalty is unspecified.
     ///
     /// Returns
     /// -------
@@ -167,13 +179,13 @@ mod pynw_native {
     ///
     #[pyfunction]
     #[pyo3(
-        signature = (similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None),
-        text_signature = "(similarity_matrix, *, gap_penalty=-1.0, insert_penalty=None, delete_penalty=None)",
+        signature = (similarity_matrix, *, gap_penalty=None, insert_penalty=None, delete_penalty=None),
+        text_signature = "(similarity_matrix, *, gap_penalty=None, insert_penalty=None, delete_penalty=None)",
     )]
     fn needleman_wunsch_score<'py>(
         py: Python<'py>,
         similarity_matrix: Bound<'py, PyAny>,
-        gap_penalty: f64,
+        gap_penalty: Option<f64>,
         insert_penalty: Option<f64>,
         delete_penalty: Option<f64>,
     ) -> PyResult<f64> {
@@ -184,8 +196,16 @@ mod pynw_native {
         })?;
         let similarity_matrix = pyarray.as_array();
 
-        let insert_penalty = insert_penalty.unwrap_or(gap_penalty);
-        let delete_penalty = delete_penalty.unwrap_or(gap_penalty);
+        let insert_penalty = insert_penalty.or(gap_penalty).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(
+                "provide gap_penalty, or provide both insert_penalty and delete_penalty",
+            )
+        })?;
+        let delete_penalty = delete_penalty.or(gap_penalty).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(
+                "provide gap_penalty, or provide both insert_penalty and delete_penalty",
+            )
+        })?;
 
         validate_inputs(similarity_matrix, insert_penalty, delete_penalty)?;
 

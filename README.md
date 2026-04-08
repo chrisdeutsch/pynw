@@ -163,7 +163,7 @@ The editops array alone is enough for aggregate statistics:
 ```python
 from pynw import EditOp, needleman_wunsch
 
-score, editops = needleman_wunsch(similarity_matrix)
+score, editops = needleman_wunsch(similarity_matrix, gap_penalty=-1.0)
 
 n_aligned = np.sum(editops == EditOp.Align)
 n_inserted = np.sum(editops == EditOp.Insert)
@@ -173,16 +173,17 @@ n_deleted = np.sum(editops == EditOp.Delete)
 When multiple alignments achieve the same optimal score, `pynw` breaks ties
 deterministically: `Align > Delete > Insert`.
 
-By default, `gap_penalty` applies equally to insertions and deletions. Pass
+`gap_penalty` applies equally to insertions and deletions. Pass
 `insert_penalty` and/or `delete_penalty` to penalize them independently, which
 is useful when the cost of missing a source element differs from the cost of
 introducing a spurious target element:
 
 ```python
+# insert uses -0.3; delete falls back to gap_penalty (-0.5)
 score, editops = needleman_wunsch(
     similarity_matrix,
+    gap_penalty=-0.5,
     insert_penalty=-0.3,
-    delete_penalty=-0.7,
 )
 ```
 
@@ -230,7 +231,7 @@ entirely, using $\mathcal{O}(m)$ memory instead of $\mathcal{O}(nm)$:
 ```python
 from pynw import needleman_wunsch_score
 
-score = needleman_wunsch_score(similarity_matrix)
+score = needleman_wunsch_score(similarity_matrix, gap_penalty=-1.0)
 ```
 
 ## Reproducing Classical Edit Distances

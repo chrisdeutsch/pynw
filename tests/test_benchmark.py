@@ -39,14 +39,14 @@ def _cost_matrix(size: int) -> np.ndarray:
 def test_benchmark_needleman_wunsch(benchmark, size: int) -> None:
     score_matrix = _score_matrix(size)
     benchmark.group = f"matrix {size}x{size}"
-    benchmark(needleman_wunsch, score_matrix)
+    benchmark(needleman_wunsch, score_matrix, gap_penalty=-1.0)
 
 
 @pytest.mark.parametrize("size", MATRIX_SIZES, ids=lambda n: f"{n}x{n}")
 def test_benchmark_needleman_wunsch_score(benchmark, size: int) -> None:
     score_matrix = _score_matrix(size)
     benchmark.group = f"matrix {size}x{size}"
-    benchmark(needleman_wunsch_score, score_matrix)
+    benchmark(needleman_wunsch_score, score_matrix, gap_penalty=-1.0)
 
 
 @pytest.mark.parametrize("size", MATRIX_SIZES, ids=lambda n: f"{n}x{n}")
