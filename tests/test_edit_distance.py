@@ -15,8 +15,9 @@ import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-from pynw import needleman_wunsch
 from rapidfuzz.distance import Hamming, Indel, LCSseq, Levenshtein
+
+from pynw import needleman_wunsch
 
 pytestmark = pytest.mark.hypothesis
 

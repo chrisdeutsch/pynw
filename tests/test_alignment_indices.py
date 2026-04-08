@@ -1,4 +1,5 @@
 import pytest
+
 from pynw import EditOp, alignment_indices
 
 

@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from pynw import alignment_indices, needleman_wunsch, needleman_wunsch_score
 from pynw._ops import EditOp
 

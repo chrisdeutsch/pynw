@@ -56,6 +56,9 @@ markers = [
 ]
 addopts = "--doctest-modules -m 'not benchmark and not slow'"
 
+[tool.ruff]
+src = ["python"]
+
 [tool.ruff.lint]
 select = [
   "E",  # pyflakes: all errors
