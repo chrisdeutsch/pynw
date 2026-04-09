@@ -60,6 +60,11 @@ pub fn needleman_wunsch(
     (score, editops)
 }
 
+/// Score-only NW fill.
+///
+/// Uses a rolling 2-row DP buffer (`O(m)` space) and carries the `diag`/`left`
+/// cells in registers across the inner loop, so each iteration performs one
+/// `prev_row` load and one `align_scores` load instead of four indexed reads.
 pub fn needleman_wunsch_score(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
@@ -69,30 +74,50 @@ pub fn needleman_wunsch_score(
 
     let mut prev_row = Array1::<f64>::zeros(m + 1);
     let mut curr_row = Array1::<f64>::zeros(m + 1);
+
+    // Row 0: reaching column j requires j inserts.
     for col in 1..=m {
         prev_row[col] = col as f64 * insert_penalty;
     }
 
     for row in 1..=n {
-        curr_row[0] = prev_row[0] + delete_penalty;
+        let score_row = align_scores.row(row - 1);
+
+        // Column 0 of each row is reached by a delete from the cell above.
+        let cell_score = prev_row[0] + delete_penalty;
+        curr_row[0] = cell_score;
+
+        // Seed the rolling window for col = 1:
+        //   diag = prev_row[0]  (the cell up-and-left of col 1)
+        //   left = curr_row[0]  (the cell immediately left of col 1)
+        let mut diag = prev_row[0];
+        let mut left = cell_score;
 
         for col in 1..=m {
-            let align = prev_row[col - 1] + align_scores[[row - 1, col - 1]];
-            let delete = prev_row[col] + delete_penalty;
-            let insert = curr_row[col - 1] + insert_penalty;
+            let up = prev_row[col];
+
+            let align = diag + score_row[col - 1];
+            let delete = up + delete_penalty;
+            let insert = left + insert_penalty;
 
             // Two sequential comparisons compile to two `maxsd` instructions,
             // faster than a three-way if/else (branchless bitwise-select, ~13
             // SSE instructions). Tie-breaking is preserved: `maxsd dst, src`
             // returns `src` on equality, so align beats delete beats insert.
-            let mut score = align;
-            if delete > score {
-                score = delete;
+            let mut cell_score = align;
+            if delete > cell_score {
+                cell_score = delete;
             }
-            if insert > score {
-                score = insert;
+            if insert > cell_score {
+                cell_score = insert;
             }
-            curr_row[col] = score;
+            curr_row[col] = cell_score;
+
+            // Shift the window one step right: this iteration's `up` is next
+            // iteration's `diag`; this iteration's result is next iteration's
+            // `left`.
+            diag = up;
+            left = cell_score;
         }
 
         std::mem::swap(&mut prev_row, &mut curr_row);
@@ -144,10 +169,12 @@ pub fn alignment_indices(editops: ArrayView1<EditOp>) -> (MaskedIndexArray, Mask
 
 /// Build the traceback direction matrix and return the final score.
 ///
-/// The DP score table is reduced to a rolling 2-row buffer (`O(m)` space). The
-/// traceback matrix must remain `O(nm)` because traceback reads it back-to-front
-/// after the fill. True linear-space traceback would require Hirschberg's
-/// divide-and-conquer algorithm.
+/// The DP score table is reduced to a rolling 2-row buffer (`O(m)` space); the
+/// inner loop carries `diag`/`left` in registers so each step does one
+/// `prev_row` load and one `align_scores` load. The traceback matrix must
+/// remain `O(nm)` because traceback reads it back-to-front after the fill.
+/// True linear-space traceback would require Hirschberg's divide-and-conquer
+/// algorithm.
 fn fill_traceback(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
@@ -162,23 +189,36 @@ fn fill_traceback(
     // to the predecessor cell.
     let mut traceback = Array2::from_elem((n + 1, m + 1), EditOp::Align);
 
-    // First row: aligning j target-elements against nothing -> j source gaps.
-    for j in 1..=m {
-        prev_row[j] = j as f64 * insert_penalty;
-        traceback[[0, j]] = EditOp::Insert;
+    // Row 0: reaching column j requires j inserts.
+    for col in 1..=m {
+        prev_row[col] = col as f64 * insert_penalty;
+        traceback[[0, col]] = EditOp::Insert;
     }
 
-    for i in 1..=n {
-        curr_row[0] = prev_row[0] + delete_penalty;
-        traceback[[i, 0]] = EditOp::Delete;
+    for row in 1..=n {
+        let score_row = align_scores.row(row - 1);
+        let mut traceback_row = traceback.row_mut(row);
 
-        for j in 1..=m {
-            let align = prev_row[j - 1] + align_scores[[i - 1, j - 1]];
-            let delete = prev_row[j] + delete_penalty;
-            let insert = curr_row[j - 1] + insert_penalty;
+        // Column 0 of each row is reached by a delete from the cell above.
+        let cell_score = prev_row[0] + delete_penalty;
+        curr_row[0] = cell_score;
+        traceback_row[0] = EditOp::Delete;
+
+        // Seed the rolling window for col = 1:
+        //   diag = prev_row[0]  (the cell up-and-left of col 1)
+        //   left = curr_row[0]  (the cell immediately left of col 1)
+        let mut diag = prev_row[0];
+        let mut left = cell_score;
+
+        for col in 1..=m {
+            let up = prev_row[col];
+
+            let align = diag + score_row[col - 1];
+            let delete = up + delete_penalty;
+            let insert = left + insert_penalty;
 
             // Tie-breaking: align > delete > insert
-            let (score, op) = if insert > delete && insert > align {
+            let (cell_score, op) = if insert > delete && insert > align {
                 (insert, EditOp::Insert)
             } else if delete > align {
                 (delete, EditOp::Delete)
@@ -186,8 +226,14 @@ fn fill_traceback(
                 (align, EditOp::Align)
             };
 
-            curr_row[j] = score;
-            traceback[[i, j]] = op;
+            curr_row[col] = cell_score;
+            traceback_row[col] = op;
+
+            // Shift the window one step right: this iteration's `up` is next
+            // iteration's `diag`; this iteration's result is next iteration's
+            // `left`.
+            diag = up;
+            left = cell_score;
         }
 
         std::mem::swap(&mut prev_row, &mut curr_row);
