@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "pynw-native"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "ndarray",
  "num_enum",
