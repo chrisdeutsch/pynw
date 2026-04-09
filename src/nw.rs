@@ -28,13 +28,13 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 #[derive(Clone, Copy, Debug, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
-pub(crate) enum EditOp {
+pub enum EditOp {
     Align = 0,
     Insert = 1,
     Delete = 2,
 }
 
-pub(crate) fn parse_editops<D: Dimension>(
+pub fn parse_editops<D: Dimension>(
     array: ArrayView<u8, D>,
 ) -> Result<Array<EditOp, D>, &'static str> {
     let dim = array.dim();
@@ -45,12 +45,12 @@ pub(crate) fn parse_editops<D: Dimension>(
     Array::from_shape_vec(dim, editops).map_err(|_| "Shape error")
 }
 
-pub(crate) struct MaskedIndexArray {
+pub struct MaskedIndexArray {
     pub indices: Array1<isize>,
     pub mask: Array1<bool>,
 }
 
-pub(crate) fn needleman_wunsch(
+pub fn needleman_wunsch(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
@@ -60,7 +60,7 @@ pub(crate) fn needleman_wunsch(
     (score, editops)
 }
 
-pub(crate) fn needleman_wunsch_score(
+pub fn needleman_wunsch_score(
     align_scores: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
@@ -101,9 +101,7 @@ pub(crate) fn needleman_wunsch_score(
     prev_row[m]
 }
 
-pub(crate) fn alignment_indices(
-    editops: ArrayView1<EditOp>,
-) -> (MaskedIndexArray, MaskedIndexArray) {
+pub fn alignment_indices(editops: ArrayView1<EditOp>) -> (MaskedIndexArray, MaskedIndexArray) {
     let k = editops.len();
 
     let mut source = MaskedIndexArray {

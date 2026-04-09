@@ -3,7 +3,7 @@ use numpy::{Element, PyArray, PyArrayMethods, PyReadonlyArray, get_array_module}
 use pyo3::{intern, prelude::*, sync::PyOnceLock, types::PyDict};
 
 // Modified version of the PyArrayLike extract method. Calls numpy.asarray(obj, dtype=dtype).
-pub(crate) fn numpy_asarray<'py>(
+pub fn numpy_asarray<'py>(
     py: Python<'py>,
     obj: Bound<'py, PyAny>,
     dtype: Bound<'py, PyAny>,
@@ -19,7 +19,7 @@ pub(crate) fn numpy_asarray<'py>(
     as_array.call((obj,), Some(&kwargs))
 }
 
-pub(crate) fn to_pyreadonly<'py, A, D>(
+pub fn to_pyreadonly<'py, A, D>(
     py: Python<'py>,
     obj: Bound<'py, PyAny>,
 ) -> PyResult<PyReadonlyArray<'py, A, D>>
@@ -40,7 +40,7 @@ where
         })
 }
 
-pub(crate) fn validate_inputs(
+pub fn validate_inputs(
     similarity_matrix: ArrayView2<f64>,
     insert_penalty: f64,
     delete_penalty: f64,
