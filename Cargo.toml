@@ -8,8 +8,8 @@ name = "pynw_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.28.2"
-numpy = "0.28.0"
+pyo3 = "0.29.0"
+numpy = "0.29.0"
 num_enum = "0.7.6"
 ndarray = "0.17.2"
 
