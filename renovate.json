@@ -11,6 +11,10 @@
       "groupName": "github actions"
     },
     {
+      "matchManagers": ["cargo"],
+      "groupName": "cargo dependencies"
+    },
+    {
       "matchManagers": ["pixi", "poetry"],
       "enabled": false
     }
