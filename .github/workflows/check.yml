@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@9dabb60412d3d2d967a8d682f7ce01317af40514 # v0.11.0
         with:
           cache: true
       - name: Formatting & linting (ruff, cargo fmt, markdownlint, actionlint)
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@9dabb60412d3d2d967a8d682f7ce01317af40514 # v0.11.0
         with:
           cache: true
       - name: cargo test
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@9dabb60412d3d2d967a8d682f7ce01317af40514 # v0.11.0
         with:
           environments: ${{ matrix.env }}
           cache: true
